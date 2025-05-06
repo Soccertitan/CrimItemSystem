@@ -9,11 +9,13 @@
 
 #include "CrimItemTypes.generated.h"
 
-class UCrimItemContainer;
-class ACrimItemDrop;
-class UCrimItem;
-class UCrimItemDef;
+struct FCrimItemExtension;
 struct FCrimItemTagStackContainer;
+struct FFastCrimItem;
+class ACrimItemDrop;
+class UCrimItemManagerComponent;
+class UCrimItemContainer;
+class UCrimItemDefinition;
 
 /**
  * Defines limitations for the quantity of an item.
@@ -23,23 +25,145 @@ struct CRIMITEMSYSTEM_API FCrimItemQuantityLimit
 {
 	GENERATED_BODY()
 
-	FCrimItemQuantityLimit()
-	{
-	}
+	FCrimItemQuantityLimit(){}
 
 	/** Return the max quantity or MAX_Int32 if unlimited. */
 	int32 GetMaxQuantity() const;
 
-private:
 	/** Limit the quantity of this item. */
 	UPROPERTY(EditAnywhere, Meta = (InlineEditConditionToggle), Category = "CrimItem")
 	bool bLimitQuantity = false;
 
 	/** The maximum quantity allowed for the item. */
-	UPROPERTY(EditAnywhere, Meta = (EditCondition="bLimitQuantity", ClampMin = 1), Category = "CrimItem")
+	UPROPERTY(EditAnywhere, Meta = (EditCondition="bLimitQuantity", ClampMin = 1), Category = "CrimItem", DisplayName = "LimitQuantity")
 	int32 MaxQuantity = 1;
 };
 
+UENUM(BlueprintType)
+enum class ECrimItemAddResult : uint8
+{
+	NoItemsAdded UMETA(DIsplayName = "No items added"),
+	SomeItemsAdded UMETA(DisplayName = "Some items added"),
+	AllItemsAdded UMETA(DisplayName = "All items added")
+};
+
+/**
+ * Describes how to add an item to a slot.
+ */
+USTRUCT()
+struct CRIMITEMSYSTEM_API FCrimAddItemPlanResultValue
+{
+	GENERATED_BODY()
+
+	FCrimAddItemPlanResultValue(){}
+	FCrimAddItemPlanResultValue(FFastCrimItem* InFastItemPtr, int32 Quantity) :
+		FastItemPtr(InFastItemPtr),
+		QuantityToAdd(Quantity)
+		{}
+
+	// The item to add quantity to. If nullptr, make a new item.
+	FFastCrimItem* FastItemPtr = nullptr;
+	
+	// The amount of item to add.
+	UPROPERTY()
+	int32 QuantityToAdd = 0;
+
+	// Returns true if the QuantityToAdd is > 0.
+	bool IsValid() const;
+};
+
+/**
+ * Represents a plan and expected results for adding an item to a container.
+ */
+USTRUCT(BlueprintType)
+struct CRIMITEMSYSTEM_API FCrimAddItemPlanResult
+{
+	GENERATED_BODY()
+
+	FCrimAddItemPlanResult(){}
+	FCrimAddItemPlanResult(int32 InItemQuantity) : AmountToGive(InItemQuantity), AmountGiven(0) {}
+
+	// The amount of the item that we tried to add
+	UPROPERTY(BlueprintReadOnly)
+	int32 AmountToGive = 0;
+
+	// The amount of the item that was actually added in the end. Maybe we tried adding 10 items, but only 8 could be added because of capacity/weight
+	UPROPERTY(BlueprintReadOnly)
+	int32 AmountGiven = 0;
+
+	// The result
+	UPROPERTY(BlueprintReadOnly)
+	ECrimItemAddResult Result = ECrimItemAddResult::NoItemsAdded;
+
+	// Describes the reason for failure to add all items.
+	UPROPERTY(BlueprintReadOnly)
+	FGameplayTag Error;
+
+	/** Returns true if all SlotPlans have valid slots and quantity to add are greater than 0. */
+	bool IsValid() const;
+	
+	/** Adds a new plan to the SlotsPlans array.*/
+	void AddSlotPlan(const FCrimAddItemPlanResultValue& InSlotPlan);
+
+	const TArray<FCrimAddItemPlanResultValue>& GetSlotPlans() const;
+
+private:
+	UPROPERTY()
+	TArray<FCrimAddItemPlanResultValue> SlotPlans;
+
+	// Adds to the AmountGiven and updates the ECrimItemAddResult.
+	void UpdateAmountGiven(int32 NewValue);
+};
+
+/**
+ * The spec used when creating new items.
+ */
+USTRUCT(BlueprintType)
+struct CRIMITEMSYSTEM_API FCrimItemSpec
+{
+	GENERATED_BODY()
+	
+	/** The item definition to associate with the item. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TObjectPtr<UCrimItemDefinition> ItemDef;
+
+	/** The quantity amount to grant for this item. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 Quantity = 1;
+
+	/** Stats to grant the item. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TMap<FGameplayTag, int32> ItemStats;
+
+	/** Custom functionality to grant the item. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ExcludeBaseStruct))
+	TArray<TInstancedStruct<FCrimItemExtension>> Extensions;
+};
+
+/**
+ * Params for the ItemDropManager on how to create a new ItemDrop actor.
+ */
+USTRUCT(BlueprintType)
+struct CRIMITEMSYSTEM_API FCrimItemDropParams
+{
+	GENERATED_BODY()
+
+	/** The ItemDrop actor class to spawn. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TSubclassOf<ACrimItemDrop> ItemDropClass;
+
+	/** The spawn location for the ItemDrop. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FVector SpawnLocation = FVector();
+
+	/** The context for dropping the item. This will be passed along to the ItemDrop. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TObjectPtr<UObject> Context;
+};
+
+//------------------------------------------------------------------------------
+// CrimItemTagStack
+//------------------------------------------------------------------------------
 
 /**
  * Represents a single gameplay tag and a count.
@@ -88,7 +212,6 @@ private:
 	friend FCrimItemTagStackContainer;
 };
 
-
 /**
  * Container of game item tag stacks, designed for fast replication.
  */
@@ -108,8 +231,11 @@ struct CRIMITEMSYSTEM_API FCrimItemTagStackContainer : public FFastArraySerializ
 	/** Add stacks to a tag. */
 	void AddStack(FGameplayTag Tag, int32 DeltaCount);
 
-	/** Remove stacks from a tag. If DeltaCount is -1 removes all. */
-	void RemoveStack(FGameplayTag Tag, int32 DeltaCount);
+	/** Subtracts stacks from a tag. */
+	void SubtractStack(FGameplayTag Tag, int32 DeltaCount);
+
+	/** Removes the Tag entirely */
+	void RemoveStack(FGameplayTag Tag);
 
 	/** Return the stack count for a tag, or 0 if the tag is not present. */
 	int32 GetStackCount(FGameplayTag Tag) const
@@ -168,147 +294,4 @@ struct TStructOpsTypeTraits<FCrimItemTagStackContainer> : public TStructOpsTypeT
 		WithNetDeltaSerializer = true,
 		WithPostSerialize = true,
 	};
-};
-
-UENUM(BlueprintType)
-enum class ECrimItemAddResult : uint8
-{
-	NoItemsAdded UMETA(DIsplayName = "No items added"),
-	SomeItemsAdded UMETA(DisplayName = "Some items added"),
-	AllItemsAdded UMETA(DisplayName = "All items added")
-};
-
-/**
- * Describes how to add an item to a slot.
- */
-USTRUCT(BlueprintType)
-struct CRIMITEMSYSTEM_API FCrimItemAddPlanSlot
-{
-	GENERATED_BODY()
-
-	FCrimItemAddPlanSlot(){}
-	FCrimItemAddPlanSlot(int32 Slot, int32 Quantity, bool bIsSlotEmpty) :
-		TargetSlot(Slot),
-		QuantityToAdd(Quantity),
-		bSlotIsEmpty(bIsSlotEmpty){}
-
-	// The slot to add the item to.
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	int32 TargetSlot = INDEX_NONE;
-
-	// The amount of item to add.
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	int32 QuantityToAdd = 0;
-
-	// If the slot is empty and can have an item.
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	bool bSlotIsEmpty = true;
-
-	// Returns true if the TargetSlot is >= 0 and the QuantityToAdd is > 0.
-	bool IsValid() const;
-};
-
-/**
- * Represents a plan for adding an item to a container. Which slots to place the item and if a new item
- * needs to be created for the slot.
- */
-USTRUCT(BlueprintType)
-struct CRIMITEMSYSTEM_API FCrimItemAddPlan
-{
-	GENERATED_BODY()
-
-	FCrimItemAddPlan(){}
-	FCrimItemAddPlan(int32 InItemQuantity) : AmountToGive(InItemQuantity), AmountGiven(0) {}
-
-	//The amount of the item that we tried to add
-	UPROPERTY(BlueprintReadOnly)
-	int32 AmountToGive = 0;
-
-	//The amount of the item that was actually added in the end. Maybe we tried adding 10 items, but only 8 could be added because of capacity/weight
-	UPROPERTY(BlueprintReadOnly)
-	int32 AmountGiven = 0;
-
-	//The result
-	UPROPERTY(BlueprintReadOnly)
-	ECrimItemAddResult Result = ECrimItemAddResult::NoItemsAdded;
-
-	// Describes the reason for failure to add all items.
-	UPROPERTY(BlueprintReadOnly)
-	FGameplayTag Error;
-
-	/** Returns true if all SlotPlans have valid slots and quantity to add are greater than 0. */
-	bool IsValid() const;
-	
-	/** Adds a new plan to the SlotsPlans array.*/
-	void AddSlotPlan(const FCrimItemAddPlanSlot& InSlotPlan);
-
-	const TArray<FCrimItemAddPlanSlot>& GetSlotPlans() const;
-
-private:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = true))
-	TArray<FCrimItemAddPlanSlot> SlotPlans;
-
-	// Adds to the AmountGiven and updates the ECrimItemAddResult.
-	void UpdateAmountGiven(int32 NewValue);
-};
-
-/**
- * The spec used when creating new items (not copies of items).
- */
-USTRUCT(BlueprintType)
-struct CRIMITEMSYSTEM_API FCrimItemSpec
-{
-	GENERATED_BODY()
-	
-	/** The item definition to associate with the item. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TSoftObjectPtr<UCrimItemDef> ItemDef;
-
-	/** The quantity amount to grant for this item. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 Quantity = 1;
-
-	/** Will apply the default stats from the ItemDef if true. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	bool bApplyDefaultStats = true;
-
-	/** Stats to grant the item. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TMap<FGameplayTag, int32> ItemStats;
-};
-
-/**
- * Spec on linking a parent container to child containers.
- */
-USTRUCT(BlueprintType)
-struct CRIMITEMSYSTEM_API FCrimItemContainerLinkSpec
-{
-	GENERATED_BODY()
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FGameplayTag ParentContainerId;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TArray<FGameplayTag> ChildContainerIds;
-};
-
-/**
- * Params for the ItemDropManager on how to create a new ItemDrop actor.
- */
-USTRUCT(BlueprintType)
-struct CRIMITEMSYSTEM_API FCrimItemDropParams
-{
-	GENERATED_BODY()
-
-	/** The ItemDrop actor class to spawn. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TSubclassOf<ACrimItemDrop> ItemDropClass;
-
-	/** The spawn location for the ItemDrop. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FVector SpawnLocation = FVector();
-
-	/** The context for dropping the item. This will be passed along to the ItemDrop. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TObjectPtr<UObject> Context;
 };

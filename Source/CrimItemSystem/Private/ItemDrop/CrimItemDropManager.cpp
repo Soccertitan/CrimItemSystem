@@ -19,27 +19,42 @@ ACrimItemDropManager::ACrimItemDropManager()
 	ItemManagerComponent = CreateDefaultSubobject<UCrimItemManagerComponent>(TEXT("ItemManagerComponent"));
 }
 
-ACrimItemDrop* ACrimItemDropManager::DropItem(UCrimItem* ItemToDrop, int32 Quantity, FCrimItemDropParams Params)
+void ACrimItemDropManager::BeginPlay()
 {
-	if (!HasAuthority() || !IsValid(ItemToDrop) || Quantity <= 0 || !Params.ItemDropClass)
+	Super::BeginPlay();
+
+	if (HasAuthority())
+	{
+		ItemContainer = ItemManagerComponent->CreateItemContainer(
+			FCrimItemGameplayTags::Get().Crim_ItemContainer_ItemDropManager, UCrimItemContainer::StaticClass());
+	}
+}
+
+ACrimItemDrop* ACrimItemDropManager::DropItem(UCrimItemContainer* SourceContainer, const FGuid& SourceItemId,
+	int32 Quantity, FCrimItemDropParams Params)
+{
+	if (!HasAuthority() ||
+		!IsValid(SourceContainer) ||
+		Quantity <= 0 ||
+		!Params.ItemDropClass ||
+		SourceContainer == ItemContainer)
 	{
 		return nullptr;
 	}
 
-	if (ItemToDrop->GetItemManagerComponent() == ItemManagerComponent)
+	FFastCrimItem* SourceFastItem = SourceContainer->GetItemFromGuid(SourceItemId);
+	if (SourceFastItem == nullptr)
 	{
-		// Can't drop items already in the ItemManagerComponent.
 		return nullptr;
 	}
 
 	ClearItemDrops();
 
-	int32 ActualQuantityToDrop = FMath::Min(ItemToDrop->GetQuantity(), Quantity);
-	UCrimItem* NewItem = ItemManagerComponent->AddItem(ItemContainerId, ItemToDrop, ActualQuantityToDrop);
-	ItemToDrop->GetItemManagerComponent()->ConsumeItem(ItemToDrop, ActualQuantityToDrop);
+	int32 ActualQuantityToDrop = FMath::Min(SourceFastItem->Item.GetPtr<FCrimItem>()->Quantity, Quantity);
+	TInstancedStruct<FCrimItem> NewItem = ItemContainer->AddItem(SourceFastItem->Item, ActualQuantityToDrop);
+	SourceContainer->ConsumeItem(SourceItemId, ActualQuantityToDrop);
 
-	ACrimItemDrop* NewItemDrop = CreateItemDrop(NewItem, Params);
-	return NewItemDrop;
+	return CreateItemDrop(NewItem.GetPtr<FCrimItem>()->GetItemGuid(), Params);
 }
 
 ACrimItemDrop* ACrimItemDropManager::DropItemBySpec(TInstancedStruct<FCrimItemSpec> ItemSpec, FCrimItemDropParams Params)
@@ -49,30 +64,21 @@ ACrimItemDrop* ACrimItemDropManager::DropItemBySpec(TInstancedStruct<FCrimItemSp
 		return nullptr;
 	}
 
-	UCrimItem* NewItem = ItemManagerComponent->AddItemFromSpec(ItemContainerId, ItemSpec);
-	if (!NewItem)
+	TInstancedStruct<FCrimItem> NewItem = ItemContainer->AddItemFromSpec(ItemSpec);
+	if (!NewItem.IsValid())
 	{
 		return nullptr;
 	}
-
+	
 	ClearItemDrops();
-	ACrimItemDrop* NewItemDrop = CreateItemDrop(NewItem, Params);
-	return NewItemDrop;
-}
-
-void ACrimItemDropManager::BeginPlay()
-{
-	Super::BeginPlay();
-
-	ItemContainerId = FCrimItemGameplayTags::Get().Crim_ItemContainer_ItemDropManager;
-	ItemManagerComponent->CreateItemContainer(ItemContainerId, UCrimItemContainer::StaticClass());
+	return CreateItemDrop(NewItem.GetPtr<FCrimItem>()->GetItemGuid(), Params);
 }
 
 void ACrimItemDropManager::ClearItemDrop(ACrimItemDrop* ItemDrop)
 {
 	ItemDrop->OnAllItemsTaken.RemoveAll(this);
 	ItemDrops.Remove(ItemDrop);
-	ItemManagerComponent->ReleaseItem(ItemDrop->GetItem());
+	ItemContainer->RemoveItem(ItemDrop->ItemId);
 	ItemDrop->Destroy();
 }
 
@@ -92,7 +98,7 @@ void ACrimItemDropManager::ClearItemDrops()
 	}
 }
 
-ACrimItemDrop* ACrimItemDropManager::CreateItemDrop(UCrimItem* Item, FCrimItemDropParams& Params)
+ACrimItemDrop* ACrimItemDropManager::CreateItemDrop(FGuid ItemId, FCrimItemDropParams& Params)
 {
 	FTransform Transform;
 	Transform.SetLocation(Params.SpawnLocation);
@@ -103,8 +109,8 @@ ACrimItemDrop* ACrimItemDropManager::CreateItemDrop(UCrimItem* Item, FCrimItemDr
 		nullptr,
 		ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn);
 
-	NewItemDrop->ItemDropManager = this;
-	NewItemDrop->InitializeItemDrop(Item, Params.Context);
+	NewItemDrop->ItemDropItemContainer = ItemContainer;
+	NewItemDrop->InitializeItemDrop(ItemId, Params.Context);
 	ItemDrops.Add(NewItemDrop);
 	NewItemDrop->OnAllItemsTaken.AddUObject(this, &ACrimItemDropManager::OnItemDropTaken);
 	UGameplayStatics::FinishSpawningActor(NewItemDrop, Transform);

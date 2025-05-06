@@ -13,12 +13,11 @@ UCrimItemContainerRule::UCrimItemContainerRule()
 	bHasCanRemoveItem = BlueprintNodeHelpers::HasBlueprintFunction(TEXT("K2_CanRemoveItem"), *this, *StaticClass());
 	bHasGetItemMaxQuantity = BlueprintNodeHelpers::HasBlueprintFunction(TEXT("K2_GetMaxNumberOfStacks"), *this, *StaticClass());
 	bHasGetItemStatckMaxQuantity = BlueprintNodeHelpers::HasBlueprintFunction(TEXT("K2_GetItemStackMaxQuantity"), *this, *StaticClass());
-	bHasGetValidSlots = BlueprintNodeHelpers::HasBlueprintFunction(TEXT("K2_GetValidSlots"), *this, *StaticClass());
 }
 
-bool UCrimItemContainerRule::CanContainItem(const UCrimItemContainer* Container, const UCrimItem* Item) const
+bool UCrimItemContainerRule::CanContainItem(const UCrimItemContainer* Container, const TInstancedStruct<FCrimItem>& Item) const
 {
-	if (IsValid(Container) && IsValid(Item))
+	if (IsValid(Container) && Item.IsValid())
 	{
 		if (bHasCanContainItem)
         {
@@ -29,9 +28,9 @@ bool UCrimItemContainerRule::CanContainItem(const UCrimItemContainer* Container,
 	return false;
 }
 
-bool UCrimItemContainerRule::CanRemoveItem(const UCrimItemContainer* Container, const UCrimItem* Item) const
+bool UCrimItemContainerRule::CanRemoveItem(const UCrimItemContainer* Container, const TInstancedStruct<FCrimItem>& Item) const
 {
-	if (IsValid(Container) && IsValid(Item))
+	if (IsValid(Container) && Item.IsValid())
 	{
 		if (bHasCanRemoveItem)
 		{
@@ -42,21 +41,9 @@ bool UCrimItemContainerRule::CanRemoveItem(const UCrimItemContainer* Container, 
 	return false;
 }
 
-TArray<int32> UCrimItemContainerRule::GetValidSlots(const UCrimItemContainer* Container, const UCrimItem* Item) const
+int32 UCrimItemContainerRule::GetMaxNumberOfStacks(const UCrimItemContainer* Container, const TInstancedStruct<FCrimItem>& Item) const
 {
-	if (IsValid(Container) && IsValid(Item))
-	{
-		if (bHasGetValidSlots)
-		{
-			return K2_GetValidSlots(Container, Item);
-		}
-	}
-	return TArray<int32>();
-}
-
-int32 UCrimItemContainerRule::GetMaxNumberOfStacks(const UCrimItemContainer* Container, const UCrimItem* Item) const
-{
-	if (IsValid(Container) && IsValid(Item))
+	if (IsValid(Container) && Item.IsValid())
 	{
 		if (bHasGetItemMaxQuantity)
 		{
@@ -67,9 +54,9 @@ int32 UCrimItemContainerRule::GetMaxNumberOfStacks(const UCrimItemContainer* Con
 	return 0;
 }
 
-int32 UCrimItemContainerRule::GetItemStackMaxQuantity(const UCrimItemContainer* Container, const UCrimItem* Item) const
+int32 UCrimItemContainerRule::GetItemStackMaxQuantity(const UCrimItemContainer* Container, const TInstancedStruct<FCrimItem>& Item) const
 {
-	if (IsValid(Container) && IsValid(Item))
+	if (IsValid(Container) && Item.IsValid())
 	{
 		if (bHasGetItemStatckMaxQuantity)
 		{

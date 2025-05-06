@@ -13,7 +13,10 @@ public class CrimItemSystem : ModuleRules
 			{
 				"Core",
 				"NetCore",
+				"DeveloperSettings",
 				"GameplayTags",
+				"UMG",
+				"ModelViewViewModel",
 			}
 			);
 			

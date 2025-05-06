@@ -3,8 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "CrimItem.h"
-#include "CrimItemList.h"
+#include "CrimItemFastTypes.h"
 #include "GameplayTagContainer.h"
 #include "UObject/Object.h"
 #if UE_WITH_IRIS
@@ -12,11 +11,12 @@
 #endif
 #include "CrimItemContainer.generated.h"
 
-class UCrimItemDef;
+class UCrimItemContainerViewModelBase;
+class UCrimItemDefinition;
 class UCrimItemContainerRule;
 class UCrimItemManagerComponent;
 
-DECLARE_MULTICAST_DELEGATE_TwoParams(FCrimItemContainerListSignature, UCrimItemContainer*, const FCrimItemListEntry&);
+DECLARE_MULTICAST_DELEGATE_TwoParams(FCrimItemContainerFastItemSignature, UCrimItemContainer*, const FFastCrimItem&);
 
 /**
  * An object that holds one or more item instances. Like an inventory, treasure chest, item pickup, or equipment.
@@ -34,8 +34,12 @@ class CRIMITEMSYSTEM_API UCrimItemContainer : public UObject
 	FGameplayTag ContainerId;
 
 	/** The user-facing display name of this container. */
-	UPROPERTY(EditAnywhere, Category = "CrimItemContainer")
+	UPROPERTY(EditAnywhere, Category = "CrimItemContainer|UI")
 	FText DisplayName;
+
+	/** The ViewModel to create for this item container. */
+	UPROPERTY(EditAnywhere, Category = "CrimItemContainer|UI", NoClear)
+	TSoftClassPtr<UCrimItemContainerViewModelBase> ViewModelClass;
 
 	/** Tags that this container has. */
 	UPROPERTY(EditAnywhere, Category = "CrimItemContainer")
@@ -49,7 +53,7 @@ class CRIMITEMSYSTEM_API UCrimItemContainer : public UObject
 	UPROPERTY(SaveGame, Replicated, EditAnywhere, meta = (EditCondition = "bLimitCapacity", ClampMin=0), Category = "CrimItemContainer")
 	int32 MaxCapacity = 0;
 
-	/** Automatically combine and stack items that are added to the container (unless explicitly added to an empty spot). */
+	/** Automatically combine and stack items that are added to the container via GetAddItemPlan. */
 	UPROPERTY(EditAnywhere, Category = "CrimItemContainer")
 	bool bAutoStack = true;
 
@@ -82,6 +86,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "CrimItemContainer")
 	FText GetDisplayName() const {return DisplayName;}
 
+	/** Returns the view model class.*/
+	UFUNCTION(BlueprintPure, Category = "CrimItemContainer")
+	TSubclassOf<UCrimItemContainerViewModel> GetViewModelClass() const;
+
 	/** Returns the Container's owned gameplay tags. */
 	UFUNCTION(BlueprintPure, Category = "CrimItemContainer")
 	const FGameplayTagContainer& GetOwnedTags() const;
@@ -90,89 +98,73 @@ public:
 	UFUNCTION(BlueprintPure, Category = "CrimItemContainer")
 	UCrimItemManagerComponent* GetItemManagerComponent() const {return ItemManagerComponent;}
 
-	/** Called when an item is added to the ItemList. */
-	FCrimItemContainerListSignature OnEntryAddedDelegate;
-	/** Called when an item is removed from the ItemList. */
-	FCrimItemContainerListSignature OnEntryRemovedDelegate;
-	/** Called when an item has been replaced in the ItemList. */
-	FCrimItemContainerListSignature OnEntryUpdatedDelegate;
-
-	/**
-	 * Returns an item at the specified slot.
-	 * @param Slot A number >= 0.
-	 */
-	UFUNCTION(BlueprintPure, Category = "CrimItemContainer")
-	UCrimItem* GetItemInSlot(int32 Slot) const;
-
-	/**
-	 * @param ItemId The unique Guid to search for.
-	 * @return The item matching the ItemId.
-	 */
-	UFUNCTION(BlueprintPure, Category = "CrimItemContainer")
-	UCrimItem* GetItemFromId(FGuid ItemId) const;
+	/** Called when an item is added to the container. */
+	FCrimItemContainerFastItemSignature OnItemAddedDelegate;
+	/** Called when an item is removed from the container. */
+	FCrimItemContainerFastItemSignature OnItemRemovedDelegate;
+	/** Called when an item's property has changed in the container. */
+	FCrimItemContainerFastItemSignature OnItemChangedDelegate;
 	
-	/** Returns a const reference to the items in the ItemList */
+	/**
+	 * @param ItemGuid The unique Guid to search for.
+	 * @return A copy of the item matching the ItemId.
+	 */
+	FFastCrimItem* GetItemFromGuid(FGuid ItemGuid) const;
+	
+	/**
+	 * @param ItemGuid The unique Guid to search for.
+	 * @return A copy of the item matching the ItemId.
+	 */
+	UFUNCTION(BlueprintPure, Category = "CrimItemContainer", DisplayName = "GetItemFromId")
+	TInstancedStruct<FCrimItem> K2_GetItemFromGuid(FGuid ItemGuid) const;
+	
+	/** Returns a const reference to all items in the ItemContainer */
 	UFUNCTION(BlueprintCallable, BlueprintPure = false, Category = "CrimItemContainer")
-	const TArray<FCrimItemListEntry>& GetItems() const;
+	const TArray<FFastCrimItem>& GetItems() const;
 
 	/**
 	 * @return The first item found with the matching ItemDefinition.
 	 */
-	UFUNCTION(BlueprintPure, Category = "CrimItemContainer")
-	UCrimItem* GetItemFromDef(const UCrimItemDef* ItemDef) const;
+	FFastCrimItem* GetItemFromDefinition(const UCrimItemDefinition* ItemDef) const;
 	
 	/**
-	 * @param bIgnoreDuplicates If false, will only add unique item instances to the array.
+	 * @return The first item found with the matching ItemDefinition.
+	 */
+	UFUNCTION(BlueprintPure, Category = "CrimItemContainer", DisplayName = "GetItemFromDefinition")
+	TInstancedStruct<FCrimItem> K2_GetItemFromDefinition(const UCrimItemDefinition* ItemDef) const;
+
+	/**
 	 * @return All items in the container by ItemDefinition.
 	 */
-	UFUNCTION(BlueprintCallable, BlueprintPure = false, Category = "CrimItemContainer")
-	TArray<UCrimItem*> GetItemsFromDef(const UCrimItemDef* ItemDef, bool bIgnoreDuplicates = true) const;
+	TArray<FFastCrimItem*> GetItemsFromDefinition(const UCrimItemDefinition* ItemDef) const;
+	
+	/**
+	 * @return All items in the container by ItemDefinition.
+	 */
+	UFUNCTION(BlueprintCallable, BlueprintPure = false, Category = "CrimItemContainer", DisplayName = "GetItemsByDefinition")
+	TArray<TInstancedStruct<FCrimItem>> K2_GetItemsFromDefinition(const UCrimItemDefinition* ItemDef) const;
 
 	/**
 	 * Returns the first item that matches the TestItem.
 	 * See UCrimItem::IsMatching
 	 */
 	UFUNCTION(BlueprintCallable, BlueprintPure = false, Category = "CrimItemContainer")
-	UCrimItem* GetMatchingItem(const UCrimItem* TestItem) const;
-	
+	TInstancedStruct<FCrimItem> GetMatchingItem(const TInstancedStruct<FCrimItem>& TestItem) const;
+
 	/**
-	 * Returns all items that matches the TestItem.
-	 * See UCrimItem::IsMatching
+	 * @note See FCrimItem::IsMatching
 	 * @param TestItem The item to check against.
-	 * @param bIgnoreDuplicates If false, will only add unique item instances to the array.
+	 * @return Pointers to all matching items.
 	 */
-	UFUNCTION(BlueprintCallable, BlueprintPure = false, Category = "CrimItemContainer")
-	TArray<UCrimItem*> GetMatchingItems(const UCrimItem* TestItem, bool bIgnoreDuplicates = true) const;
-
-	/**
-	 * Returns all slots that match the TestItem.
-	 * See UCrimItem::IsMatching
-	 */
-	UFUNCTION(BlueprintCallable, BlueprintPure = false, Category = "CrimItemContainer")
-	TArray<int32> GetMatchingItemSlots(const UCrimItem* TestItem) const;
+	TArray<FFastCrimItem*> GetMatchingItems(const TInstancedStruct<FCrimItem>& TestItem) const;
 	
 	/**
-	 * Gets all slots that the specific item is in.
-	 * @param TestItem The Item to search for.
-	 * @return The slots the item is in.
+	 * @note See FCrimItem::IsMatching
+	 * @param TestItem The item to check against.
+	 * @return A copy of all items that match the TestItem.
 	 */
-	UFUNCTION(BlueprintCallable, BlueprintPure = false, Category = "CrimItemContainer")
-	TArray<int32> GetSlotsFromItem(const UCrimItem* TestItem) const;
-
-	/**
-	 * Searches the ItemList where item's have been slotted (An item assigned to slot 0 or greater) and finds the
-	 * next lowest slot available.
-	 * @param Slot The slot to start searching at.
-	 * @return The next empty slot. INDEX_NONE is no available empty slots.
-	 */
-	UFUNCTION(BlueprintPure, Category = "CrimItemContainer")
-	int32 GetNextEmptySlot(int32 Slot = 0) const;
-	
-	/**
-	 * @return True if the item instance exists in the container.
-	 */
-	UFUNCTION(BlueprintPure, Category = "CrimItemContainer")
-	bool HasItem(const UCrimItem* TestItem) const;
+	UFUNCTION(BlueprintCallable, BlueprintPure = false, Category = "CrimItemContainer", DisplayName = "GetMatchingItems")
+	TArray<TInstancedStruct<FCrimItem>> K2_GetMatchingItems(const TInstancedStruct<FCrimItem>& TestItem) const;
 	
 	/**
 	 * @return True if the item exists in the container. 
@@ -181,29 +173,12 @@ public:
 	bool HasItemById(FGuid ItemId) const;
 
 	/**
-	 * Checks to see if the slot is >= 0 and less than MaxCapacity. 
-	 * @param Slot The slot to check.
-	 * @return Returns true if the slot is valid.
-	 */
-	UFUNCTION(BlueprintPure, Category = "CrimItemContainer")
-	bool IsValidSlot(int32 Slot) const;
-
-	/**
-	 * Calls GetValidSlots and checks if the passed in Slot is contained in the array.
-	 * @param TestItem The item to test.
-	 * @param Slot The slot to check.
-	 * @return True if the specified slot is valid for the item.
-	 */
-	UFUNCTION(BlueprintPure, Category = "CrimItemContainer")
-	bool IsValidSlotForItem(const UCrimItem* TestItem, int32 Slot) const;
-
-	/**
 	 * Finds the most restrictive rule and applies it.
 	 * @param TestItem The item to check.
 	 * @return True, if this container can have this item.
 	 */
 	UFUNCTION(BlueprintPure, Category = "CrimItemContainer")
-	virtual bool CanContainItem(const UCrimItem* TestItem) const;
+	virtual bool CanContainItem(const TInstancedStruct<FCrimItem>& TestItem) const;
 
 	/**
 	 * Finds the most restrictive rule and applies it.
@@ -211,27 +186,8 @@ public:
 	 * @return True, if this container can have it's item removed.
 	 */
 	UFUNCTION(BlueprintPure, Category = "CrimItemContainer")
-	virtual bool CanRemoveItem(const UCrimItem* TestItem) const;
+	virtual bool CanRemoveItem(const TInstancedStruct<FCrimItem>& TestItem) const;
 
-	/**
-	 * Finds all the valid slots and adds them to the array. Checks the container rules and adds them together.
-	 * @param TestItem The item to check.
-	 * @return Returns an array of valid slots the item can be in or empty if all slots are valid.
-	 */
-	UFUNCTION(BlueprintPure, Category = "CrimItemContainer")
-	virtual TArray<int32> GetValidSlots(const UCrimItem* TestItem) const;
-
-	/**
-	 *	Parent Container Functionality
-	 *
-	 *	Parent Containers are a 'primary' container for storing items. Items can be stored here and should respect
-	 *	stack, container, and collection limits. This container should not ever have multiple items of the same instance
-	 *	stored in a slot on these containers.
-	 *
-	 *	Primary functions is the GetAddItemPlan and GetAddItemPlanForSlot. It will inform the ItemManager component
-	 *	on how to add items to this container.
-	 */
-public:
 	/**
 	 * Informs the caller on how to add items to this container. Specifically, if a new item needs to be created,
 	 * which slots, and how many to add to each slot.
@@ -241,34 +197,15 @@ public:
 	 * @return The plan to add items to the container.
 	 */
 	UFUNCTION(BlueprintPure, Category = "CrimItemContainer")
-	FCrimItemAddPlan GetAddItemPlan(UCrimItem* Item, int32 ItemQuantity, int32 MaxNewItemStacks) const;
+	virtual FCrimAddItemPlanResult GetAddItemPlan(const TInstancedStruct<FCrimItem>& Item, int32 ItemQuantity, int32 MaxNewItemStacks) const;
 
 	/**
-	 * Informs the caller on how to add an item to the specified slot in this container. If the slot has an item in it that
-	 * does not match, an invalid SlotPlan will be returned.
-	 * @param Item The item you want to add to this container.
-	 * @param ItemQuantity The amount from that item to add.
-	 * @param MaxNewItemStacks The amount of new item stacks that are allowed to be created. Derived from the item's collection limit.
-	 * @param Slot The slot to place the item in.
-	 * @return The plan to add an item to this container.
-	 */
-	UFUNCTION(BlueprintPure, Category = "CrimItemContainer")
-	FCrimItemAddPlan GetAddItemPlanForSlot(UCrimItem* Item, int32 ItemQuantity, int32 MaxNewItemStacks, int32 Slot) const;
-
-	/**
-	 * @param ItemPlan The ItemPlan to update.
 	 * @param Item The item to check
+	 * @param ItemPlan The ItemPlan to update.
 	 * @param ItemQuantity The quantity of item to add.
-	 * @param Slot The slot to add the item. -1 for undefined.
-	 * @return Returns true if the item could be added. False if item can't be added.
+	 * @return Returns true if the item could be added.
 	 */
-	bool CanAddItem(FCrimItemAddPlan& ItemPlan, UCrimItem* Item, int32 ItemQuantity, int32 Slot = -1) const;
-
-	/**
-	 * @return True if this container is a parent.
-	 */
-	UFUNCTION(BlueprintPure, Category = "CrimItemContainer")
-	bool IsParentContainer() const;
+	bool CanAddItem(const TInstancedStruct<FCrimItem>& Item, FCrimAddItemPlanResult& ItemPlan, int32 ItemQuantity) const;
 
 	/**
 	 * @return The max number of item instances allowed in this container.
@@ -310,142 +247,228 @@ public:
 	 * Gets all matching items. Then adds up the quantity for each item and compares that number to the limit. The limit
 	 * considers the remaining ItemContainer capacity and Item Container limits.
 	 * @param TestItem The item to match against. 
-	 * @return The maximum number of quantity allowed to be added to the container.
+	 * @return The maximum amount allowed to be added to the container.
 	 */
 	UFUNCTION(BlueprintPure, Category = "CrimItemContainer")
-	int32 GetRemainingCapacityForItem(UCrimItem* TestItem) const;
+	int32 GetRemainingCapacityForItem(const TInstancedStruct<FCrimItem>& TestItem) const;
 
 	/**
-	 * Will check the container rules and the item definition. Whichever value is most restrictive.
+	 * Will check the container rules and the item. Whichever value is most restrictive.
 	 * @param TestItem The Item to check.
 	 * @return Returns the maximum number of unique item instances this item can consume in this container.
 	 */
 	UFUNCTION(BlueprintPure, Category = "CrimItemContainer")
-	virtual int32 GetItemContainerLimit(const UCrimItem* TestItem) const;
+	virtual int32 GetItemContainerLimit(const TInstancedStruct<FCrimItem>& TestItem) const;
 
 	/**
-	 * Will check the container rules and the item definition. Will use the most restrictive option compared between
-	 * the item Def and the Rules.
+	 * Will check the container rules and the item. Whichever value is most restrictive.
 	 * @param TestItem The item to check.
 	 * @return Return the maximum allowed quantity for a single stack of an item.
 	 */
 	UFUNCTION(BlueprintPure, Category = "CrimItemContainer")
-	virtual int32 GetItemQuantityLimit(const UCrimItem* TestItem) const;
-	
-	/**
-	 * Compares TestItem->GetQuantity() >= GetItemQuantityLimit()
-	 * @param TestItem The item to check.
-	 * @return False, if there is available space.
-	 */
-	UFUNCTION(BlueprintPure, Category = "CrimItemContainer")
-	bool IsItemAtQuantityLimit(const UCrimItem* TestItem) const;
+	virtual int32 GetItemQuantityLimit(const TInstancedStruct<FCrimItem>& TestItem) const;
 
 	/**
-	 * Counts the number of Matching Items and compares it to GetItemContainerLimit.
+	 * Counts the number of Items with the same ItemDef and compares it to GetItemContainerLimit.
 	 * @param TestItem The item to check.
 	 * @return True if no more item stacks can be created in this container.
 	 */
 	UFUNCTION(BlueprintPure, Category = "CrimItemContainer")
-	bool IsItemAtContainerLimit(const UCrimItem* TestItem) const;
+	bool IsItemAtContainerLimit(const TInstancedStruct<FCrimItem>& TestItem) const;
+
+	UFUNCTION(BlueprintPure, Category = "CrimItemContainer")
+	bool HasAuthority() const;
 
 	/**
-	 * Child Container Functionality
-	 *
-	 * A child container cannot hold the primary instance of an Item Instance. The Item Manager must only add references
-	 * to this ItemContainer from one of its parent containers. If an item in its parent container is removed, it will
-	 * also remove it from this container.
-	 *
-	 * This type of container is ideal if you want to 'equip' items but not remove it from the primary container.
+	 * Adds an item to this container. It will make a copy of the item
+	 * and add as much as possible to the container. This respects limits set on the container and ItemManager.
+	 * @param Item The item to add.
+	 * @param Quantity The amount of the item to add.
+	 * @return The actual amount of the item that was added and any errors if the item could not be added in full.
 	 */
-public:
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "CrimItemContainer")
+	virtual FCrimAddItemPlanResult TryAddItem(const TInstancedStruct<FCrimItem>& Item, int32 Quantity);
+
+	/**
+	 * Creates a new item from the passed in item. Copying everything the original item had. Then this item is added
+	 * directly to the ItemContainer. Use TryAddItem instead to respect container and ItemManager rules.
+	 * @param Item The item to add.
+	 * @param Quantity The quantity to set the new item with.
+	 * @return A copy of the newly created item.
+	 */
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "CrimItemContainer")
+	virtual TInstancedStruct<FCrimItem> AddItem(const TInstancedStruct<FCrimItem>& Item, int32 Quantity);
+
+	/**
+	 * Tries to create an item from the ItemSpec then makes copies of the item to add to the container. This respects
+	 * limits set on the container and ItemManager.
+	 * @param ItemSpec How the new item will be created.
+	 * @return How much of the item was actually added to the ItemManager.
+	 */
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "CrimItemContainer")
+	virtual FCrimAddItemPlanResult TryAddItemFromSpec(UPARAM(ref) const TInstancedStruct<FCrimItemSpec>& ItemSpec);
+
+	/**
+	 * Creates an item from an ItemSpec. The spec is passed to the item to apply the values. Then this new item is added
+	 * directly to the ItemContainer. Use TryAddItemFromSpec instead to respect container and ItemManager rules.
+	 * and ItemManager rules.
+	 * @param ItemSpec How the new item will be created.
+	 * @return A copy of the newly created item.
+	 */
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "CrimItemContainer")
+	virtual TInstancedStruct<FCrimItem> AddItemFromSpec(UPARAM(ref) const TInstancedStruct<FCrimItemSpec>& ItemSpec);
+
+	/**
+	 * Tries to create an item from the ItemDefinition and applies the default stats. Then makes copies of the item to
+	 * add to the container. This respects limits set on the container and ItemManager.
+	 * @param ItemDef The item definition.
+	 * @param Quantity The amount of the item.
+	 * @return How much of the item was actually added to the ItemManager
+	 */
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "CrimItemContainer")
+	virtual FCrimAddItemPlanResult TryAddItemFromDefinition(const UCrimItemDefinition* ItemDef, int32 Quantity);
+
+	/**
+	 * Creates an item from an ItemDefinition and applies the default stats. Then this item is added directly to the
+	 * ItemContainer. Use TryAddItemFromDefinition instead to respect container and ItemManager rules.
+	 * @param ItemDef The item definition.
+	 * @param Quantity The amount of the item.
+	 * @return A copy of the newly created item.
+	 */
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "CrimItemContainer")
+	virtual TInstancedStruct<FCrimItem> AddItemFromDefinition(const UCrimItemDefinition* ItemDef, int32 Quantity);
+
+	/**
+	 * Consumes the specified quantity of the item. The item's quantity can't go below 0. If it is 0, removes the
+	 * item from the ItemContainer.
+	 * @param ItemId The item to consume quantity from.
+	 * @param Quantity The amount to subtract from the item.
+	 */
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "CrimItemContainer")
+	void ConsumeItem(UPARAM(ref) const FGuid& ItemId, int32 Quantity);
+
+	/**
+	 * Gets all items with the matching ItemDef. Then subtracts quantity from them until the amount subtracted has reached
+	 * 0. Then, if an item's quantity is 0, removes the item from the container.
+	 * @param ItemDef The ItemDef to look for amongst items.
+	 * @param Quantity The total quantity to subtract from the items.
+	 */
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "CrimItemContainer")
+	void ConsumeItemsByDefinition(const UCrimItemDefinition* ItemDef, int32 Quantity);
 	
 	/**
-	 * @return True if this container is a child.
+	 * Tries to manually remove the item from being managed by the ItemContainer. If CanRemoveItem is true,
+	 * the item will have all references removed and marked for garbage.
+	 * @param ItemId The item to remove.
+	 * @return True, if the item was removed.
+	 */
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "CrimItemContainer")
+	bool RemoveItem(UPARAM(ref) const FGuid& ItemId);
+
+	/**
+	 * Checks to see if the Item can be moved to the target container. The TargetContainer must be
+	 * different from the TestItem's container.
+	 * @param TestItem The item to check.
+	 * @param TargetContainer The target container you want to move the item to.
+	 * @param Quantity The amount of the item to try and place in the TargetContainer.
+	 * @param OutPlan The valid plan on how to add the item to the TargetContainer.
+	 * @return True, if the item can be moved into the TargetContainer.
+	 */
+	UFUNCTION(BlueprintPure, Category = "CrimItemManagerComponent")
+	bool CanMoveItemToContainer(const TInstancedStruct<FCrimItem>& TestItem, const UCrimItemContainer* TargetContainer, int32 Quantity,
+		FCrimAddItemPlanResult& OutPlan) const;
+
+	/**
+	 * Tries to move some or all of an item from its current ItemContainer to the TargetContainer.
+	 * @param ItemId The item you wish to move.
+	 * @param TargetContainer The ItemContainer to move the item into.
+	 * @param Quantity The amount of the item from the SourceContainer to the TargetContainer.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "CrimItemManagerComponent")
+	void MoveItemToContainer(UPARAM(ref) const FGuid& ItemId, UCrimItemContainer* TargetContainer, int32 Quantity);
+
+	/**
+	 * @param TestItem The item to check if it can be split.
+	 * @param Quantity The amount to try and split off from the TestItem.
+	 * @return True, if the item can be split into two stacks in it's existing container.
 	 */
 	UFUNCTION(BlueprintPure, Category = "CrimItemContainer")
-	bool IsChildContainer() const;
+	bool CanSplitItemStack(const TInstancedStruct<FCrimItem>& TestItem, int32 Quantity) const;
 
-private:
-	
 	/**
-	 * Called on a ParentContainer to update all children that it had an item removed.
-	 * @param OldItem The item that was removed from the parent.
-	 */
-	void RefreshChildContainers(UCrimItem* OldItem);
-
-	//---------------------------------------------------------------------------------------------
-	// Container Link Functionality
-	//---------------------------------------------------------------------------------------------
-public:
-	
-	/**
-	 * @return All linked containers.
+	 * Tries to split the item stack in the existing container.
+	 * @param ItemId The Item to try and split.
+	 * @param Quantity The amount to split off from the original item into to the new item.
 	 */
 	UFUNCTION(BlueprintCallable, Category = "CrimItemContainer")
-	TArray<UCrimItemContainer*> GetLinkedContainers() const;
+	void SplitItemStack(UPARAM(ref) const FGuid& ItemId, int32 Quantity);
 
 	/**
-	 * 
-	 * @param TestItemContainer The container to test.
-	 * @return True if the TestItemContainer is linked to this container.
+	 * Checks to see if the items are matching and how much of the SourceItem can be added to the TargetItem.
+	 * @param SourceItem The item you want to merge into the TargetItem.
+	 * @param TargetItem The item you targeted to be merged with.
+	 * @param OutMaxQuantity The maximum quantity of the SourceItem allowed to be added to the TargetItem.
+	 * @return True, if SourceItem can be stacked into the TargetItem.
 	 */
-	UFUNCTION(BlueprintPure, Category = "CrimItemContainer")
-	bool IsContainerLinked(UCrimItemContainer* TestItemContainer) const;
-
-private:
+	UFUNCTION(BlueprintPure, Category = "CrimItemManagerComponent")
+	bool CanStackItems(const TInstancedStruct<FCrimItem>& SourceItem, const TInstancedStruct<FCrimItem>& TargetItem, int32& OutMaxQuantity) const;
 
 	/**
-	 * Links the TargetContainer to this container.
-	 * @param TargetContainer The container to link with.
-	 * @return True if successful in linking the container.
+	 * Tries to stack the SourceItem into the TargetItem by the specified quantity.
+	 * @param SourceItemId The item you want to merge.
+	 * @param TargetItemId The SourceItem will attempt to merge into this item.
+	 * @param Quantity The amount from the SourceItem to stack with the TargetItem.
 	 */
-	bool LinkContainers(UCrimItemContainer* TargetContainer);
+	UFUNCTION(BlueprintCallable, Category = "CrimItemManagerComponent")
+	void StackItems(UPARAM(ref) const FGuid& SourceItemId, UPARAM(ref) const FGuid& TargetItemId, int32 Quantity);
 
-	/**
-	 * Unlinks this container with the TargetContainer.
-	 * @param TargetContainer The container to unlink with.
-	 * @return True if successful in unlinking the containers.
-	 */
-	bool UnlinkContainers(UCrimItemContainer* TargetContainer);
-
-	//-------------------------------------------------------------------------
-	// End of Container Link Functionality
-	//-------------------------------------------------------------------------
+	/** Call to mark that an Item has been modified */
+	void MarkItemDirty(FFastCrimItem& FastItem);
 	
 protected:
-	/** Called when an item is added to the list. */
-	UFUNCTION(BlueprintImplementableEvent, Category = "CrimItemContainer", DisplayName = "OnEntryAdded")
-	void K2_OnEntryAdded(const FCrimItemListEntry& Item);
-	/** Called when an item is added to the list. */
-	virtual void OnEntryAdded(const FCrimItemListEntry& Item){}
-	/** Called when an item is removed from the list. */
-	UFUNCTION(BlueprintImplementableEvent, Category = "CrimItemContainer", DisplayName = "OnEntryRemoved")
-	void K2_OnEntryRemoved(const FCrimItemListEntry& Item);
-	/** Called when an item is removed from the list. */
-	virtual void OnEntryRemoved(const FCrimItemListEntry& Item){}
-	/** Called when an item has replaced an existing item in the list. */
-	UFUNCTION(BlueprintImplementableEvent, Category = "CrimItemContainer", DisplayName = "OnEntryUpdated")
-	void K2_OnEntryUpdated(const FCrimItemListEntry& Item);
-	/** Called when an item has replaced an existing item in the list. */
-	virtual void OnEntryUpdated(const FCrimItemListEntry& Item){}
 
 	/** Is called in the ItemManagerComponent. Use this for BeginPlay functionality. */
-	virtual void Initialize(UCrimItemManagerComponent* ItemManager, FGameplayTag NewContainerId, bool bInIsParent = true);
+	virtual void Initialize(UCrimItemManagerComponent* ItemManager, FGameplayTag NewContainerId);
+
+	/**
+	 * Creates a new item instance and initializes it.
+	 * @param ItemDef The new item will be based off this ItemDefinition.
+	 * @param ItemId The id to assign the new item with.
+	 * @param OutItemInstance The newly created item.
+	 * @return True if the item was created successfully.
+	 */
+	bool CreateItem(const UCrimItemDefinition* ItemDef, FGuid ItemId, TInstancedStruct<FCrimItem>& OutItemInstance);
+
+	/** Executes the AddItemPlan. */
+	void ExecuteAddItemPlan(FCrimAddItemPlanResult& Plan, const TInstancedStruct<FCrimItem>& TemplateItem);
+
+	/** Adds the Item to this container's FastArray of items. */
+	void AddItemToItemContainer(TInstancedStruct<FCrimItem>& Item);
+
+	/** Removes the item from the container by Id */
+	void RemoveFromItemList(const FGuid& ItemId);
+
+	/** Called when an item is added to the container. */
+	virtual void OnItemAdded(const FFastCrimItem& Item){}
+	/** Called when an item is added to the container. */
+	UFUNCTION(BlueprintImplementableEvent, Category = "CrimItemContainer", DisplayName = "OnItemAdded")
+	void K2_OnItemAdded(const FFastCrimItem& Item);
+
+	/** Called when an item is removed from the container. */
+	virtual void OnItemRemoved(const FFastCrimItem& Item){}
+	/** Called when an item is removed from the container. */
+	UFUNCTION(BlueprintImplementableEvent, Category = "CrimItemContainer", DisplayName = "OnItemRemoved")
+	void K2_OnItemRemoved(const FFastCrimItem& Item);
+
+	/** Called when an item has been changed in the container. */
+	virtual void OnItemChanged(const FFastCrimItem& Item) {}
+	/** Called when an item has been changed in the container. */
+	UFUNCTION(BlueprintImplementableEvent, Category = "CrimItemContainer", DisplayName = "OnItemChanged")
+	void K2_OnItemChanged(const FFastCrimItem& Item);
 	
 private:
 	UPROPERTY(Replicated)
-	FCrimItemList ItemList;
-
-	/**
-	 * If true, this container can store items. False, it's considered a child and can only reference items from the
-	 * LinkedContainers.
-	 */
-	UPROPERTY(Replicated)
-	bool bIsParent = true;
-	
-	/** Contains an array of ItemContainers. */
-	UPROPERTY(Replicated)
-	TArray<TObjectPtr<UCrimItemContainer>> LinkedContainers;
+	FFastCrimItemList ItemList;
 
 	/** The owner of this item container. */
 	UPROPERTY(Replicated)

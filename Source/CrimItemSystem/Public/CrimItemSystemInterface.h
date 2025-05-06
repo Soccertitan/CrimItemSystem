@@ -15,7 +15,7 @@ class UCrimItemSystemInterface : public UInterface
 };
 
 /**
- * 
+ * Actors that implement this interface will only return a CrimItemManagerComponent.
  */
 class CRIMITEMSYSTEM_API ICrimItemSystemInterface
 {

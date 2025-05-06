@@ -3,9 +3,8 @@
 
 #include "CrimItemSaveDataTypes.h"
 
-#include "CrimItem.h"
 #include "CrimItemContainer.h"
-#include "CrimItemDef.h"
+#include "CrimItemDefinition.h"
 #include "GameplayTagContainer.h"
 #include "Serialization/ObjectAndNameAsStringProxyArchive.h"
 
@@ -23,27 +22,27 @@ FCrimItemContainerSaveData::FCrimItemContainerSaveData(UCrimItemContainer* InIte
 	FObjectAndNameAsStringProxyArchive Ar(MemWriter, true);
 	Ar.ArIsSaveGame = true;
 	InItemContainer->Serialize(Ar);
+	
+	for (const FFastCrimItem& FastItem : InItemContainer->GetItems())
+	{
+		FFastCrimItem* Mutable = const_cast<FFastCrimItem*>(&FastItem);
+		Items.Add(FCrimItemSaveData(Mutable->Item));
+	}
 }
 
-FCrimItemSaveData::FCrimItemSaveData(UCrimItem* InItem, int32 InSlot)
+FCrimItemSaveData::FCrimItemSaveData(TInstancedStruct<FCrimItem>& InItem)
 {
-	if (!IsValid(InItem))
+	if (!InItem.IsValid())
 	{
 		return;
 	}
 
-	ItemId = InItem->GetItemId();
-	ItemDef = InItem->GetItemDefinition()->GetPathName();
-	Slot = InSlot;
+	const FCrimItem* ItemPtr = InItem.GetPtr<FCrimItem>();
+	
+	ItemDef = ItemPtr->GetItemDefinition()->GetPathName();
 
 	FMemoryWriter MemWriter(ByteData);
 	FObjectAndNameAsStringProxyArchive Ar(MemWriter, true);
 	Ar.ArIsSaveGame = true;
-	InItem->Serialize(Ar);
-}
-
-FCrimItemSaveData_Child::FCrimItemSaveData_Child(FGuid InGuid, int32 InSlot)
-{
-	ItemId = InGuid;
-	Slot = InSlot;
+	InItem.Serialize(Ar);
 }

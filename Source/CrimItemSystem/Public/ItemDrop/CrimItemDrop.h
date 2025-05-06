@@ -4,14 +4,14 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "StructUtils/InstancedStruct.h"
 #include "CrimItemDrop.generated.h"
 
-struct FGameplayTag;
-struct FCrimItemAddPlan;
+struct FCrimItem;
 class ACrimItemDropManager;
-class UCrimItemManagerComponent;
-class UCrimItem;
 class ACrimItemDrop;
+class UCrimItemManagerComponent;
+class UCrimItemContainer;
 
 DECLARE_MULTICAST_DELEGATE_OneParam(FCrimItemDropGenericSignature, ACrimItemDrop*);
 
@@ -33,23 +33,23 @@ public:
 
 	/**
 	 * The ItemManagerComponent can try and take this item drop and all the quantity.
-	 * @param ItemManagerComponent The ItemManager taking this ItemDrop.
-	 * @param ContainerId The container to put the item in.
+	 * @param ItemContainer The container to put the item in.
 	 */
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "CrimItemDrop")
-	void TakeItem(UCrimItemManagerComponent* ItemManagerComponent, FGameplayTag ContainerId);
+	void TakeItem(UCrimItemContainer* ItemContainer);
 
 	/**
-	 * @return The item instance held by this item drop.
+	 * @return A copy of the item held by this item drop.
 	 */
 	UFUNCTION(BlueprintPure, Category = "CrimItemDrop")
-	UCrimItem* GetItem() const;
+	TInstancedStruct<FCrimItem> GetItem() const;
 
-	/**
-	 * @return True if the CrimItem is a valid instance.
-	 */
 	UFUNCTION(BlueprintPure, Category = "CrimItemDrop")
-	bool HasValidItemInstance() const;
+	bool HasValidItem() const;
+
+	/** Returns the ItemContainer from the ItemDrop */
+	UFUNCTION(BlueprintPure, Category = "CrimItemDrop")
+	UCrimItemContainer* GetItemContainer() const;
 
 	/**
 	 * Decides if the passed in ItemManager can attempt to take this ItemDrop.
@@ -61,29 +61,29 @@ public:
 
 	/**
 	 * Initializes this actor with an Item and optional context data.
-	 * @param InItem The item to assign this ItemDrop.
+	 * @param InItemId The item to assign this ItemDrop.
 	 * @param Context Custom user data that can be passed in and processed.
 	 */
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "CrimItemDrop")
-	virtual void InitializeItemDrop(UCrimItem* InItem, UObject* Context);
+	virtual void InitializeItemDrop(FGuid InItemId, UObject* Context);
 	
 protected:
 
 	/**
 	 * Called on the server when this actor has been initialized with an item.
-	 * @param InItem The item this actor was initialized with. The Item is guaranteed to be valid.
+	 * @param InItemId The item this actor was initialized with. The Item is guaranteed to be valid.
 	 * @param Context Custom user data that can be passed in and processed.
 	 */
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "InitializeItemDrop")
-	void K2_InitializeItemDrop(UCrimItem* InItem, UObject* Context);
+	void K2_InitializeItemDrop(FGuid InItemId, UObject* Context);
 
 private:
 	UPROPERTY(Replicated)
-	TObjectPtr<UCrimItem> Item;
+	FGuid ItemId;
 
-	/** Cached here for quick reference. */
-	UPROPERTY()
-	TObjectPtr<ACrimItemDropManager> ItemDropManager;
+	/** Cached reference to the ItemContainer from the ItemDropManager. */
+	UPROPERTY(BlueprintReadOnly, meta = (AllowPrivateAccess = true))
+	TObjectPtr<UCrimItemContainer> ItemDropItemContainer;
 
 	friend ACrimItemDropManager;
 };

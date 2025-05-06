@@ -4,6 +4,7 @@
 #include "ItemDrop/CrimItemDrop.h"
 
 #include "CrimItem.h"
+#include "CrimItemContainer.h"
 #include "CrimItemManagerComponent.h"
 #include "Net/UnrealNetwork.h"
 
@@ -21,56 +22,82 @@ void ACrimItemDrop::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& 
 
 	FDoRepLifetimeParams Params;
 	Params.bIsPushBased = true;
-	DOREPLIFETIME_WITH_PARAMS_FAST(ACrimItemDrop, Item, Params);
+	DOREPLIFETIME_WITH_PARAMS_FAST(ACrimItemDrop, ItemId, Params);
 }
 
-void ACrimItemDrop::TakeItem(UCrimItemManagerComponent* ItemManagerComponent, FGameplayTag ContainerId)
+void ACrimItemDrop::TakeItem(UCrimItemContainer* ItemContainer)
 {
 	if (!HasAuthority() ||
-		!IsValid(Item) ||
-		!IsValid(ItemManagerComponent) ||
-		!ContainerId.IsValid() ||
-		ItemManagerComponent == Item->GetItemManagerComponent())
+		!ItemId.IsValid() ||
+		!IsValid(ItemContainer) ||
+		ItemContainer == ItemDropItemContainer)
 	{
-		// ItemManagerComponent can't be the same as the one that owns the item already.
+		// The existing ItemContainer can't take its own item.
 		return;
 	}
 
-	FCrimItemAddPlan Result = ItemManagerComponent->TryAddItem(ContainerId, Item, Item->GetQuantity());
-	if (Result.IsValid())
+	FFastCrimItem* FastItem = ItemDropItemContainer->GetItemFromGuid(ItemId);
+	if (FastItem == nullptr)
 	{
-		Item->SetQuantity(Item->GetQuantity() - Result.AmountGiven);
+		return;
 	}
 
-	if (Item->GetQuantity() <= 0)
+	FCrimItem* Item = FastItem->Item.GetMutablePtr<FCrimItem>();
+
+	FCrimAddItemPlanResult Result = ItemContainer->TryAddItem(FastItem->Item, Item->Quantity);
+	if (Result.IsValid())
 	{
+		Item->Quantity = Item->Quantity - Result.AmountGiven;
+		ItemDropItemContainer->MarkItemDirty(*FastItem);
+	}
+
+	if (Item->Quantity <= 0)
+	{
+		ItemDropItemContainer->RemoveItem(ItemId);
 		OnAllItemsTaken.Broadcast(this);
 	}
 }
 
-UCrimItem* ACrimItemDrop::GetItem() const
+TInstancedStruct<FCrimItem> ACrimItemDrop::GetItem() const
 {
-	return Item;
+	return ItemDropItemContainer->K2_GetItemFromGuid(ItemId);
 }
 
-bool ACrimItemDrop::HasValidItemInstance() const
+bool ACrimItemDrop::HasValidItem() const
 {
-	return IsValid(Item);
-}
-
-void ACrimItemDrop::InitializeItemDrop(UCrimItem* InItem, UObject* Context)
-{
-	if (IsValid(InItem) && HasAuthority())
+	if (!ItemId.IsValid())
 	{
-		Item = InItem;
-		MARK_PROPERTY_DIRTY_FROM_NAME(ThisClass, Item, this);
-		K2_InitializeItemDrop(InItem, Context);
+		return false;
+	}
+
+	FFastCrimItem* FastItem = ItemDropItemContainer->GetItemFromGuid(ItemId);
+
+	if (FastItem == nullptr)
+	{
+		return false;
+	}
+
+	return true;
+}
+
+UCrimItemContainer* ACrimItemDrop::GetItemContainer() const
+{
+	return ItemDropItemContainer;
+}
+
+void ACrimItemDrop::InitializeItemDrop(FGuid InItemId, UObject* Context)
+{
+	if (HasAuthority())
+	{
+		ItemId = InItemId;
+		MARK_PROPERTY_DIRTY_FROM_NAME(ThisClass, ItemId, this);
+		K2_InitializeItemDrop(ItemId, Context);
 	}
 }
 
 bool ACrimItemDrop::CanTakeItem_Implementation(UCrimItemManagerComponent* ItemManager) const
 {
-	return HasValidItemInstance();
+	return HasValidItem();
 }
 
 
