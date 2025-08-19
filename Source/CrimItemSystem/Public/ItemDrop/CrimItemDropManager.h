@@ -7,11 +7,12 @@
 #include "StructUtils/InstancedStruct.h"
 #include "CrimItemDropManager.generated.h"
 
+struct FCrimItem;
 struct FCrimItemSpec;
 struct FCrimItemDropParams;
 class ACrimItemDrop;
 class UCrimItemManagerComponent;
-class UCrimItemContainer;
+class UCrimItemContainerBase;
 
 /**
  * Manages the replication for ItemDrops and their items.
@@ -31,15 +32,13 @@ public:
 	virtual void BeginPlay() override;
 
 	/**
-	 * Drops an existing item from an ItemManagerComponent.
-	 * @param SourceContainer The container that has the item to drop.
-	 * @param SourceItemId The Item to drop.
-	 * @param Quantity The amount to drop from the item.
+	 * Takes the passed in Item and tries to represent it in the world.
+	 * @param Item The item to drop.
 	 * @param Params Defines the ItemDropActor.
 	 * @return The newly created ItemDrop.
 	 */
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "CrimItemDropManager")
-	ACrimItemDrop* DropItem(UCrimItemContainer* SourceContainer, UPARAM(ref) const FGuid& SourceItemId, int32 Quantity, FCrimItemDropParams Params);
+	ACrimItemDrop* DropItem(UPARAM(ref) const TInstancedStruct<FCrimItem>& Item, FCrimItemDropParams Params);
 
 	/**
 	 * Creates a new item drop from an ItemSpec.
@@ -47,8 +46,8 @@ public:
 	 * @param Params 
 	 * @return The newly created ItemDrop.
 	 */
-	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "CrimItemDropManager")
-	ACrimItemDrop* DropItemBySpec(TInstancedStruct<FCrimItemSpec> ItemSpec, FCrimItemDropParams Params);
+	// UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "CrimItemDropManager")
+	// ACrimItemDrop* DropItemBySpec(TInstancedStruct<FCrimItemSpec> ItemSpec, FCrimItemDropParams Params);
 
 protected:
 
@@ -67,7 +66,7 @@ private:
 	TArray<ACrimItemDrop*> ItemDrops;
 	// Cached off value of the ItemContainer
 	UPROPERTY()
-	UCrimItemContainer* ItemContainer;
+	UCrimItemContainerBase* ItemContainer;
 
 	/** If at MaxItemDrops, makes enough space for one new item drop. */
 	void ClearItemDrops();

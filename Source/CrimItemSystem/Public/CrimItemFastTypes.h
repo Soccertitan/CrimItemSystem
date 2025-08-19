@@ -9,6 +9,7 @@
 
 #include "CrimItemFastTypes.generated.h"
 
+class UCrimItemContainerBase;
 struct FFastCrimItemContainerList;
 class UCrimItemManagerComponent;
 struct FFastCrimItem;
@@ -17,7 +18,7 @@ struct FFastCrimItemList;
 /**
  * FastArraySerializerItem wrapper for a CrimItem.
  * 
- * This is needed because in order to avoid data slicing an FCrimItem as a direct FastArraySerializerItem, it needs to be handled with a TInstancedStruct.
+ * This is needed to avoid data slicing an FCrimItem as a direct FastArraySerializerItem, it needs to be handled with a TInstancedStruct.
  * TInstancedStruct does not support FastArray Serialization. Therefore, we need to wrap it in our own type.
  * 
  */
@@ -27,7 +28,7 @@ struct CRIMITEMSYSTEM_API FFastCrimItem : public FFastArraySerializerItem
 	GENERATED_BODY()
 	
 	friend class UCrimItemManagerComponent;
-	friend class UCrimItemContainer;
+	friend class UCrimItemContainerBase;
 	friend struct FFastCrimItemList;
 
 	void Initialize(const TInstancedStruct<FCrimItem>& InItem);
@@ -42,12 +43,12 @@ struct CRIMITEMSYSTEM_API FFastCrimItem : public FFastArraySerializerItem
 	UPROPERTY(BlueprintReadOnly, meta = (AllowPrivateAccess))
 	TInstancedStruct<FCrimItem> Item;
 
-	/** Holds the value of the previous version of the item during a broadcast event.*/
+	/** Holds the previous value of the item during a broadcast event.*/
 	TInstancedStruct<FCrimItem> GetPreReplicatedItem() const { return PreReplicatedChangeItem; }
 private:
 
 	/* A copy of the Item which we use as a lookup for the previous values of changed properties. */
-	UPROPERTY(NotReplicated)
+	UPROPERTY(NotReplicated, BlueprintReadOnly, meta = (AllowPrivateAccess))
 	TInstancedStruct<FCrimItem> PreReplicatedChangeItem;
 };
 
@@ -78,7 +79,7 @@ struct CRIMITEMSYSTEM_API FFastCrimItemList : public FFastArraySerializer
     void AddItem(const TInstancedStruct<FCrimItem>& Item);
 
     /** Removes an Item from the list. */
-    bool RemoveItem(const FGuid& ItemId);
+    bool RemoveItem(const FGuid& ItemGuid);
 
     /** Returns a const reference of all the Items within the container. */
     const TArray<FFastCrimItem>& GetItems() const;
@@ -111,30 +112,30 @@ struct TStructOpsTypeTraits<FFastCrimItemList> : public TStructOpsTypeTraitsBase
  * Holds an ItemContainer.
  */
 USTRUCT(BlueprintType)
-struct CRIMITEMSYSTEM_API FFastCrimItemContainer : public FFastArraySerializerItem
+struct CRIMITEMSYSTEM_API FFastCrimItemContainerItem : public FFastArraySerializerItem
 {
 	GENERATED_BODY()
 
 	FString ToDebugString() const;
 
-	UCrimItemContainer* GetItemContainer() const { return ItemContainer; }
+	UCrimItemContainerBase* GetItemContainer() const { return ItemContainer; }
 
 	//~ Begin of FFastArraySerializerItem
-	void PostReplicatedAdd(const FFastCrimItemContainerList& InContainer);
-	void PreReplicatedRemove(const FFastCrimItemContainerList& InContainer);
+	void PostReplicatedAdd(const FFastCrimItemContainerList& InItemContainerList);
+	void PreReplicatedRemove(const FFastCrimItemContainerList& InItemContainerList);
 	//~ End of FFastArraySerializerItem
 
 private:
 	UPROPERTY(BlueprintReadOnly, meta = (AllowPrivateAccess = true))
-	TObjectPtr<UCrimItemContainer> ItemContainer = nullptr;
+	TObjectPtr<UCrimItemContainerBase> ItemContainer = nullptr;
 
 	friend FFastCrimItemContainerList;
 
-	friend bool operator==(const FFastCrimItemContainer& X, const FFastCrimItemContainer& Y)
+	friend bool operator==(const FFastCrimItemContainerItem& X, const FFastCrimItemContainerItem& Y)
 	{
 		return X.ItemContainer == Y.ItemContainer;
 	}
-	friend bool operator!=(const FFastCrimItemContainer& X, const FFastCrimItemContainer& Y)
+	friend bool operator!=(const FFastCrimItemContainerItem& X, const FFastCrimItemContainerItem& Y)
 	{
 		return X.ItemContainer != Y.ItemContainer;
 	}
@@ -148,7 +149,7 @@ struct CRIMITEMSYSTEM_API FFastCrimItemContainerList : public FFastArraySerializ
 {
 	GENERATED_BODY()
 
-	DECLARE_MULTICAST_DELEGATE_OneParam(FCrimItemContainerListUpdatedSignature, const FFastCrimItemContainer& );
+	DECLARE_MULTICAST_DELEGATE_OneParam(FCrimItemContainerListUpdatedSignature, const FFastCrimItemContainerItem& );
 	
 	FFastCrimItemContainerList() {}
 
@@ -158,25 +159,25 @@ struct CRIMITEMSYSTEM_API FFastCrimItemContainerList : public FFastArraySerializ
 	FCrimItemContainerListUpdatedSignature OnItemContainerRemovedDelegate;
 	
 	/** Adds a new item container the list. */
-	void AddItemContainer(UCrimItemContainer* ItemContainer);
+	void AddItemContainer(UCrimItemContainerBase* ItemContainer);
 
 	/**
 	 * Removes the item container from the list.
 	 */
-	void RemoveItemContainer(UCrimItemContainer* ItemContainer);
+	void RemoveItemContainer(UCrimItemContainerBase* ItemContainer);
 	
 	/** Gets a const reference to the item containers. */
-	const TArray<FFastCrimItemContainer>& GetItemContainers() const;
+	const TArray<FFastCrimItemContainerItem>& GetItemContainers() const;
 
 	bool NetDeltaSerialize(FNetDeltaSerializeInfo& DeltaParms)
 	{
-		return FastArrayDeltaSerialize<FFastCrimItemContainer, FFastCrimItemContainerList>(Items, DeltaParms, *this);
+		return FastArrayDeltaSerialize<FFastCrimItemContainerItem, FFastCrimItemContainerList>(Items, DeltaParms, *this);
 	}
 
 private:
 	/** Replicated list of item containers. */
 	UPROPERTY(BlueprintReadOnly, meta = (AllowPrivateAccess = true))
-	TArray<FFastCrimItemContainer> Items;
+	TArray<FFastCrimItemContainerItem> Items;
 };
 
 template <>

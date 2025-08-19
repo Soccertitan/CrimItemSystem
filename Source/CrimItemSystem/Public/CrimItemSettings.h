@@ -7,7 +7,7 @@
 #include "Engine/DeveloperSettings.h"
 #include "CrimItemSettings.generated.h"
 
-class UCrimItemContainer;
+class UCrimItemContainerBase;
 /**
  * 
  */
@@ -20,16 +20,16 @@ public:
 
 	UCrimItemSettings();
 
-	/** The id to use for default item containers. */
+	/** The default guid for item containers. */
 	UPROPERTY(Config, EditAnywhere, BlueprintReadWrite)
 	FGameplayTag DefaultContainerId;
 
 	/** The default ItemContainer to use. */
 	UPROPERTY(Config, EditAnywhere, BlueprintReadWrite)
-	TSoftClassPtr<UCrimItemContainer> DefaultItemContainerClass;
+	TSoftClassPtr<UCrimItemContainerBase> DefaultItemContainerClass;
 
 	virtual FName GetCategoryName() const override;
 
 	static FGameplayTag GetDefaultContainerId();
-	static TSubclassOf<UCrimItemContainer> GetDefaultItemContainerClass();
+	static TSubclassOf<UCrimItemContainerBase> GetDefaultItemContainerClass();
 };

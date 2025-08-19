@@ -3,19 +3,19 @@
 
 #include "CrimItemSaveDataTypes.h"
 
-#include "CrimItemContainer.h"
+#include "ItemContainer/CrimItemContainer.h"
 #include "CrimItemDefinition.h"
 #include "GameplayTagContainer.h"
 #include "Serialization/ObjectAndNameAsStringProxyArchive.h"
 
-FCrimItemContainerSaveData::FCrimItemContainerSaveData(UCrimItemContainer* InItemContainer)
+FCrimItemContainerSaveData::FCrimItemContainerSaveData(UCrimItemContainerBase* InItemContainer)
 {
 	if (!IsValid(InItemContainer))
 	{
 		return;
 	}
 
-	ContainerId = InItemContainer->GetContainerId();
+	ContainerId = InItemContainer->GetContainerGuid();
 	ItemContainerClass = InItemContainer->GetClass();
 
 	FMemoryWriter MemWriter(ByteData);

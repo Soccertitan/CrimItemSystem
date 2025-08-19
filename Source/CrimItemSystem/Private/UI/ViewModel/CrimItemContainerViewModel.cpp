@@ -3,8 +3,9 @@
 
 #include "UI/ViewModel/CrimItemContainerViewModel.h"
 
-#include "CrimItemContainer.h"
+#include "ItemContainer/CrimItemContainerBase.h"
 #include "CrimItemDefinition.h"
+#include "ItemContainer/CrimItemContainer.h"
 #include "UI/ViewModel/CrimItemViewModelBase.h"
 
 FText UCrimItemContainerViewModel::GetItemContainerName() const
@@ -19,17 +20,25 @@ TArray<UCrimItemViewModelBase*> UCrimItemContainerViewModel::GetItems() const
 
 int32 UCrimItemContainerViewModel::GetConsumedCapacity() const
 {
-	return GetItemContainer()->GetConsumedCapacity();
+	return GetCrimItemContainer()->GetConsumedCapacity();
 }
 
 int32 UCrimItemContainerViewModel::GetMaxCapacity() const
 {
-	return GetItemContainer()->GetMaxCapacity();
+	return GetCrimItemContainer()->GetMaxCapacity();
+}
+
+UCrimItemContainer* UCrimItemContainerViewModel::GetCrimItemContainer() const
+{
+	return Cast<UCrimItemContainer>(GetItemContainer());
 }
 
 void UCrimItemContainerViewModel::OnItemContainerSet()
 {
 	Super::OnItemContainerSet();
+
+	checkf(GetCrimItemContainer(), TEXT("The ItemContainer is not of type CrimItemContainer. Update the Item Container "
+		"ViewModel in %s"), *GetItemContainer()->GetName());
 
 	ItemViewModels.Empty();
 	for (const FFastCrimItem& FastItem : GetItemContainer()->GetItems())

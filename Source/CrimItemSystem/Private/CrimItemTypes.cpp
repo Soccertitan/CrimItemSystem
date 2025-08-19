@@ -11,9 +11,9 @@ int32 FCrimItemQuantityLimit::GetMaxQuantity() const
 	return bLimitQuantity ? MaxQuantity : MAX_int32;
 }
 
-bool FCrimAddItemPlanResultValue::IsValid() const
+bool FCrimAddItemPlanEntry::IsValid() const
 {
-	if (QuantityToAdd <= 0)
+	if (QuantityToAdd < 0)
 	{
 		return false;
 	}
@@ -21,13 +21,13 @@ bool FCrimAddItemPlanResultValue::IsValid() const
 	return true;
 }
 
-bool FCrimAddItemPlanResult::IsValid() const
+bool FCrimAddItemPlan::IsValid() const
 {
-	if (SlotPlans.Num() == 0)
+	if (Entries.Num() == 0)
 	{
 		return false;
 	}
-	for (const FCrimAddItemPlanResultValue& Entry : SlotPlans)
+	for (const FCrimAddItemPlanEntry& Entry : Entries)
 	{
 		if (!Entry.IsValid())
 		{
@@ -37,48 +37,57 @@ bool FCrimAddItemPlanResult::IsValid() const
 	return true;
 }
 
-void FCrimAddItemPlanResult::AddSlotPlan(const FCrimAddItemPlanResultValue& InSlotPlan)
+void FCrimAddItemPlan::AddEntry(const FCrimAddItemPlanEntry& InEntry)
 {
-	if (!InSlotPlan.IsValid())
+	if (!InEntry.IsValid())
 	{
 		return;
 	}
 	
-	for (FCrimAddItemPlanResultValue& Plan : SlotPlans)
+	for (FCrimAddItemPlanEntry& Entry : Entries)
 	{
-		if (Plan.FastItemPtr != nullptr &&
-			Plan.FastItemPtr == InSlotPlan.FastItemPtr)
+		if (Entry.FastItemPtr != nullptr &&
+			Entry.FastItemPtr == InEntry.FastItemPtr)
 		{
-			UpdateAmountGiven(-Plan.QuantityToAdd + InSlotPlan.QuantityToAdd);
-			Plan = InSlotPlan;
+			UpdateAmountGiven(-Entry.QuantityToAdd + InEntry.QuantityToAdd);
+			Entry = InEntry;
 			return;
 		}
 	}
-	UpdateAmountGiven(InSlotPlan.QuantityToAdd);
-	SlotPlans.Add(InSlotPlan);
+	UpdateAmountGiven(InEntry.QuantityToAdd);
+	Entries.Add(InEntry);
 }
 
-const TArray<FCrimAddItemPlanResultValue>& FCrimAddItemPlanResult::GetSlotPlans() const
+const TArray<FCrimAddItemPlanEntry>& FCrimAddItemPlan::GetEntries() const
 {
-	return SlotPlans;
+	return Entries;
 }
 
-void FCrimAddItemPlanResult::UpdateAmountGiven(int32 NewValue)
+void FCrimAddItemPlan::UpdateAmountGiven(int32 NewValue)
 {
 	AmountGiven = AmountGiven + NewValue;
 
-	if (AmountGiven <= 0)
+	if (AmountGiven >= AmountToGive)
 	{
-		Result = ECrimItemAddResult::NoItemsAdded;
+		Result = ECrimAddItemResult::AllItemsAdded;
 	}
-	else if (AmountGiven < AmountToGive)
+	else if (AmountGiven <= 0)
 	{
-		Result = ECrimItemAddResult::SomeItemsAdded;
+		Result = ECrimAddItemResult::NoItemsAdded;
 	}
 	else
 	{
-		Result = ECrimItemAddResult::AllItemsAdded;
+		Result = ECrimAddItemResult::SomeItemsAdded;
 	}
+}
+
+FCrimAddItemResult::FCrimAddItemResult(const FCrimAddItemPlan& InPlan, const TArray<TInstancedStruct<FCrimItem>>& InItems)
+{
+	AmountToGive = InPlan.AmountToGive;
+	AmountGiven = InPlan.AmountGiven;
+	Result = InPlan.Result;
+	Error = InPlan.Error;
+	Items = InItems;
 }
 
 //----------------------------------------------------------------------------------------

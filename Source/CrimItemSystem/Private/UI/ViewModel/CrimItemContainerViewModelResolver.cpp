@@ -3,7 +3,7 @@
 
 #include "UI/ViewModel/CrimItemContainerViewModelResolver.h"
 
-#include "CrimItemContainer.h"
+#include "ItemContainer/CrimItemContainer.h"
 #include "CrimItemSettings.h"
 #include "Blueprint/UserWidget.h"
 #include "UI/CrimItemContainerProvider.h"
@@ -13,7 +13,7 @@
 UCrimItemContainerViewModelBase* UCrimItemContainerViewModelResolverBase::GetItemContainerViewModel(const UUserWidget* UserWidget,
                                                                                        const UMVVMView* View) const
 {
-	UCrimItemContainer* ItemContainer = GetItemContainer(UserWidget, View);
+	UCrimItemContainerBase* ItemContainer = GetItemContainer(UserWidget, View);
 	if (IsValid(ItemContainer))
 	{
 		// Get the view model for the container.
@@ -23,7 +23,7 @@ UCrimItemContainerViewModelBase* UCrimItemContainerViewModelResolverBase::GetIte
 	return nullptr;
 }
 
-UCrimItemContainer* UCrimItemContainerViewModelResolverBase::GetItemContainer(const UUserWidget* UserWidget,
+UCrimItemContainerBase* UCrimItemContainerViewModelResolverBase::GetItemContainer(const UUserWidget* UserWidget,
 	const UMVVMView* View) const
 {
 	return nullptr;
@@ -43,7 +43,7 @@ UObject* UVMR_CrimItemContainer::CreateInstance(const UClass* ExpectedType, cons
 	return GetItemContainerViewModel(UserWidget, View);
 }
 
-UCrimItemContainer* UVMR_CrimItemContainer::GetItemContainer(const UUserWidget* UserWidget, const UMVVMView* View) const
+UCrimItemContainerBase* UVMR_CrimItemContainer::GetItemContainer(const UUserWidget* UserWidget, const UMVVMView* View) const
 {
 	UCrimItemUISubsystem* ItemUISubsystem = UserWidget->GetWorld()->GetSubsystem<UCrimItemUISubsystem>();
 	const FCrimItemViewContext Context(UserWidget);

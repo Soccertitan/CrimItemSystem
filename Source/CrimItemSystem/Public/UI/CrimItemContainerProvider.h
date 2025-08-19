@@ -7,7 +7,7 @@
 #include "UObject/Object.h"
 #include "CrimItemContainerProvider.generated.h"
 
-class UCrimItemContainer;
+class UCrimItemContainerBase;
 
 /** Context passed into a UCrimItemContainerProvider. */
 USTRUCT(BlueprintType)
@@ -35,7 +35,7 @@ class CRIMITEMSYSTEM_API UCrimItemContainerProvider : public UObject
 public:
 	/** Returns the relevant item container. */
 	UFUNCTION(BlueprintNativeEvent)
-	UCrimItemContainer* ProvideContainer(FGameplayTag ContainerId, FCrimItemViewContext Context) const;
+	UCrimItemContainerBase* ProvideContainer(FGameplayTag ContainerId, FCrimItemViewContext Context) const;
 };
 
 /**
@@ -48,5 +48,5 @@ class UCrimItemContainerProvider_Player : public UCrimItemContainerProvider
 	GENERATED_BODY()
 
 public:
-	virtual UCrimItemContainer* ProvideContainer_Implementation(FGameplayTag ContainerId, FCrimItemViewContext Context) const override;
+	virtual UCrimItemContainerBase* ProvideContainer_Implementation(FGameplayTag ContainerId, FCrimItemViewContext Context) const override;
 };

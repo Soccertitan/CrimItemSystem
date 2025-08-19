@@ -23,7 +23,7 @@ UCrimItemManagerComponent* UCrimItemStatics::GetCrimItemManagerComponent(const A
 	return Actor->FindComponentByClass<UCrimItemManagerComponent>();
 }
 
-const UCrimItemDefinition* UCrimItemStatics::GetItemDefinition(TInstancedStruct<FCrimItem> Item)
+const UCrimItemDefinition* UCrimItemStatics::GetItemDefinition(const TInstancedStruct<FCrimItem>& Item)
 {
 	if (Item.IsValid())
 	{
@@ -35,4 +35,35 @@ const UCrimItemDefinition* UCrimItemStatics::GetItemDefinition(TInstancedStruct<
 		return Item.Get<FCrimItem>().GetItemDefinition().Get();
 	}
 	return nullptr;
+}
+
+TInstancedStruct<FCrimItemFragment> UCrimItemStatics::K2_GetItemFragment(const TInstancedStruct<FCrimItem>& Item, const UScriptStruct* FragmentType)
+{
+	if (Item.IsValid() && FragmentType)
+	{
+		const FCrimItem* ItemPtr = Item.GetPtr<FCrimItem>();
+		for (const TInstancedStruct<FCrimItemFragment>& Fragment : ItemPtr->Fragments)
+		{
+			if (Fragment.IsValid() && Fragment.GetScriptStruct()->IsChildOf(FragmentType))
+			{
+				return Fragment;
+			}
+		}
+	}
+	return TInstancedStruct<FCrimItemFragment>();
+}
+
+TInstancedStruct<FCrimItemDefinitionFragment> UCrimItemStatics::K2_GetItemDefinitionFragment(const UCrimItemDefinition* ItemDefinition, const UScriptStruct* FragmentType)
+{
+	if (ItemDefinition && FragmentType)
+	{
+		for (const TInstancedStruct<FCrimItemDefinitionFragment>& Fragment : ItemDefinition->Fragments)
+		{
+			if (Fragment.IsValid() && Fragment.GetScriptStruct()->IsChildOf(FragmentType))
+			{
+				return Fragment;
+			}
+		}
+	}
+	return TInstancedStruct<FCrimItemDefinitionFragment>();
 }

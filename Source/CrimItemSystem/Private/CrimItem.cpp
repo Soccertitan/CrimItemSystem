@@ -24,6 +24,11 @@ bool FCrimItem::IsMatching(const TInstancedStruct<FCrimItem>& TestItem) const
 		return false;
 	}
 
+	if (!AreFragmentsEqual(TestItem))
+	{
+		return false;
+	}
+
 	if (TestItem.GetPtr<FCrimItem>()->TagStats != TagStats)
 	{
 		return false;
@@ -37,31 +42,72 @@ UCrimItemManagerComponent* FCrimItem::GetItemManager() const
 	return ItemManager.Get();
 }
 
-UCrimItemContainer* FCrimItem::GetItemContainer() const
+UCrimItemContainerBase* FCrimItem::GetItemContainer() const
 {
 	return ItemContainer.Get();
 }
 
-void FCrimItem::Initialize(FGuid NewItemId, const UCrimItemDefinition* ItemDef)
+bool FCrimItem::AreFragmentsEqual(const TInstancedStruct<FCrimItem>& TestItem) const
 {
-	ItemGuid = NewItemId;
-	ItemDefinition = ItemDef->GetPathName();
-}
-
-void FCrimItem::ApplyItemSpec(const TInstancedStruct<FCrimItemSpec>& Spec)
-{
-	const FCrimItemSpec* ConstSpec = Spec.GetPtr<FCrimItemSpec>();
-	Quantity = ConstSpec->Quantity;
-	Extensions = ConstSpec->Extensions;
+	const FCrimItem* TestItemPtr = TestItem.GetPtr<FCrimItem>();
 	
-	for (const TTuple<FGameplayTag, int>& Pair : ConstSpec->ItemStats)
+	// Compare this Item's extensions to the TestItem's extensions.
+	for (const TInstancedStruct<FCrimItemFragment>& Fragment : Fragments)
 	{
-		TagStats.AddStack(Pair.Key, Pair.Value);
+		if (Fragment.IsValid())
+		{
+			if (const FCrimItemFragment* FragmentPtr = TestItemPtr->GetFragmentByScriptStruct(Fragment.GetScriptStruct()))
+			{
+				if (!FragmentPtr->IsMatching(Fragment))
+				{
+					return false;
+				}
+			}
+			else
+			{
+				return false;
+			}
+		}
 	}
+
+	// Compare all the TestItem's extensions with this Item's extensions.
+	for (const TInstancedStruct<FCrimItemFragment>& Ext : TestItemPtr->Fragments)
+	{
+		if (Ext.IsValid())
+		{
+			if (const FCrimItemFragment* FragmentPtr = GetFragmentByScriptStruct(Ext.GetScriptStruct()))
+			{
+				if (!FragmentPtr->IsMatching(Ext))
+				{
+					return false;
+				}
+			}
+			else
+			{
+				return false;
+			}
+		}
+	}
+
+	return true;
 }
 
-void FCrimItem::ApplyItemDef(const UCrimItemDefinition* ItemDef)
+const FCrimItemFragment* FCrimItem::GetFragmentByScriptStruct(const UScriptStruct* Struct) const
 {
+	for (const TInstancedStruct<FCrimItemFragment>& Fragment : Fragments)
+	{
+		if (Fragment.GetScriptStruct() == Struct)
+		{
+			return Fragment.GetPtr<FCrimItemFragment>();
+		}
+	}
+	return nullptr;
+}
+
+void FCrimItem::Initialize(const UCrimItemDefinition* ItemDef)
+{
+	ItemDefinition = ItemDef->GetPathName();
+
 	for (const TTuple<FGameplayTag, int>& Pair : ItemDef->DefaultStats)
 	{
 		TagStats.AddStack(Pair.Key, Pair.Value);

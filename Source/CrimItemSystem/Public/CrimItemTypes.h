@@ -9,7 +9,9 @@
 
 #include "CrimItemTypes.generated.h"
 
-struct FCrimItemExtension;
+class UCrimItemContainerBase;
+struct FCrimItem;
+struct FCrimItemFragment;
 struct FCrimItemTagStackContainer;
 struct FFastCrimItem;
 class ACrimItemDrop;
@@ -40,7 +42,7 @@ struct CRIMITEMSYSTEM_API FCrimItemQuantityLimit
 };
 
 UENUM(BlueprintType)
-enum class ECrimItemAddResult : uint8
+enum class ECrimAddItemResult : uint8
 {
 	NoItemsAdded UMETA(DIsplayName = "No items added"),
 	SomeItemsAdded UMETA(DisplayName = "Some items added"),
@@ -48,15 +50,15 @@ enum class ECrimItemAddResult : uint8
 };
 
 /**
- * Describes how to add an item to a slot.
+ * Describes how to add a specific item.
  */
 USTRUCT()
-struct CRIMITEMSYSTEM_API FCrimAddItemPlanResultValue
+struct CRIMITEMSYSTEM_API FCrimAddItemPlanEntry
 {
 	GENERATED_BODY()
 
-	FCrimAddItemPlanResultValue(){}
-	FCrimAddItemPlanResultValue(FFastCrimItem* InFastItemPtr, int32 Quantity) :
+	FCrimAddItemPlanEntry(){}
+	FCrimAddItemPlanEntry(FFastCrimItem* InFastItemPtr, int32 Quantity) :
 		FastItemPtr(InFastItemPtr),
 		QuantityToAdd(Quantity)
 		{}
@@ -75,69 +77,78 @@ struct CRIMITEMSYSTEM_API FCrimAddItemPlanResultValue
 /**
  * Represents a plan and expected results for adding an item to a container.
  */
-USTRUCT(BlueprintType)
-struct CRIMITEMSYSTEM_API FCrimAddItemPlanResult
+USTRUCT()
+struct CRIMITEMSYSTEM_API FCrimAddItemPlan
 {
 	GENERATED_BODY()
 
-	FCrimAddItemPlanResult(){}
-	FCrimAddItemPlanResult(int32 InItemQuantity) : AmountToGive(InItemQuantity), AmountGiven(0) {}
+	FCrimAddItemPlan(){}
+	FCrimAddItemPlan(int32 InItemQuantity) : AmountToGive(InItemQuantity), AmountGiven(0) {}
 
 	// The amount of the item that we tried to add
-	UPROPERTY(BlueprintReadOnly)
+	UPROPERTY()
 	int32 AmountToGive = 0;
 
 	// The amount of the item that was actually added in the end. Maybe we tried adding 10 items, but only 8 could be added because of capacity/weight
-	UPROPERTY(BlueprintReadOnly)
+	UPROPERTY()
 	int32 AmountGiven = 0;
 
 	// The result
-	UPROPERTY(BlueprintReadOnly)
-	ECrimItemAddResult Result = ECrimItemAddResult::NoItemsAdded;
+	UPROPERTY()
+	ECrimAddItemResult Result = ECrimAddItemResult::NoItemsAdded;
 
 	// Describes the reason for failure to add all items.
-	UPROPERTY(BlueprintReadOnly)
+	UPROPERTY()
 	FGameplayTag Error;
 
 	/** Returns true if all SlotPlans have valid slots and quantity to add are greater than 0. */
 	bool IsValid() const;
 	
-	/** Adds a new plan to the SlotsPlans array.*/
-	void AddSlotPlan(const FCrimAddItemPlanResultValue& InSlotPlan);
+	/** Adds a new Entry to the Entries array. Will properly update the AmountGiven. */
+	void AddEntry(const FCrimAddItemPlanEntry& InEntry);
 
-	const TArray<FCrimAddItemPlanResultValue>& GetSlotPlans() const;
+	const TArray<FCrimAddItemPlanEntry>& GetEntries() const;
 
 private:
 	UPROPERTY()
-	TArray<FCrimAddItemPlanResultValue> SlotPlans;
+	TArray<FCrimAddItemPlanEntry> Entries;
 
 	// Adds to the AmountGiven and updates the ECrimItemAddResult.
 	void UpdateAmountGiven(int32 NewValue);
 };
 
 /**
- * The spec used when creating new items.
+ * Represents the items added to an ItemContainer.
  */
 USTRUCT(BlueprintType)
-struct CRIMITEMSYSTEM_API FCrimItemSpec
+struct FCrimAddItemResult
 {
 	GENERATED_BODY()
-	
-	/** The item definition to associate with the item. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TObjectPtr<UCrimItemDefinition> ItemDef;
+	FCrimAddItemResult(){}
+	FCrimAddItemResult(const FCrimAddItemPlan& InPlan, const TArray<TInstancedStruct<FCrimItem>>& InItems);
 
-	/** The quantity amount to grant for this item. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 Quantity = 1;
+	/** A copy of the items added to the ItemContainer. */
+	UPROPERTY(BlueprintReadOnly)
+	TArray<TInstancedStruct<FCrimItem>> Items;
 
-	/** Stats to grant the item. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TMap<FGameplayTag, int32> ItemStats;
+	// The amount of the item that we tried to add
+	UPROPERTY(BlueprintReadOnly)
+	int32 AmountToGive = 0;
 
-	/** Custom functionality to grant the item. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ExcludeBaseStruct))
-	TArray<TInstancedStruct<FCrimItemExtension>> Extensions;
+	/**
+	 * The amount of the item that was actually added in the end. Maybe we tried adding 10 items, but only 8 could be
+	 * added because of capacity/weight.
+	 */
+	UPROPERTY(BlueprintReadOnly)
+	int32 AmountGiven = 0;
+
+	// The result
+	UPROPERTY(BlueprintReadOnly)
+	ECrimAddItemResult Result = ECrimAddItemResult::NoItemsAdded;
+
+	// Describes the reason for failure to add all items.
+	UPROPERTY(BlueprintReadOnly)
+	FGameplayTag Error;
 };
 
 /**
@@ -294,4 +305,18 @@ struct TStructOpsTypeTraits<FCrimItemTagStackContainer> : public TStructOpsTypeT
 		WithNetDeltaSerializer = true,
 		WithPostSerialize = true,
 	};
+};
+
+USTRUCT(BlueprintType)
+struct CRIMITEMSYSTEM_API FCrimStartupItems
+{
+	GENERATED_BODY()
+
+	// The ItemContainer class to create.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TSubclassOf<UCrimItemContainerBase> ItemContainerClass;
+
+	// The items to try and add to the container.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TArray<TInstancedStruct<FCrimItem>> Items;
 };

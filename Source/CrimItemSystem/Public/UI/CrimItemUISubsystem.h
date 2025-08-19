@@ -10,7 +10,7 @@
 class UCrimItemContainerViewModelBase;
 struct FCrimItemViewContext;
 class UCrimItemContainerProvider;
-class UCrimItemContainer;
+class UCrimItemContainerBase;
 
 /**
  * Subsystem for working with game items UI.
@@ -23,7 +23,7 @@ class CRIMITEMSYSTEM_API UCrimItemUISubsystem : public UWorldSubsystem
 public:
 	/** Get a view model for an ItemContainer, reusing an existing one if it already exists. */
 	UFUNCTION(BlueprintCallable, Category = "CrimItemUISubsystem")
-	UCrimItemContainerViewModelBase* GetOrCreateItemContainerViewModel(UCrimItemContainer* Container);
+	UCrimItemContainerViewModelBase* GetOrCreateItemContainerViewModel(UCrimItemContainerBase* Container);
 
 	/** Get a view model for an ItemContainer, reusing an existing one if it already exists. */
 	UFUNCTION(BlueprintCallable, Category = "CrimItemUISubsystem")
@@ -31,12 +31,12 @@ public:
 
 	/** Retrieve an ItemContainer from a provider class, given view context. */
 	UFUNCTION(BlueprintCallable, Category = "CrimItemUISubsystem")
-	UCrimItemContainer* GetItemContainerFromProvider(TSubclassOf<UCrimItemContainerProvider> Provider, FGameplayTag ContainerId, const FCrimItemViewContext& Context);
+	UCrimItemContainerBase* GetItemContainerFromProvider(TSubclassOf<UCrimItemContainerProvider> Provider, FGameplayTag ContainerId, const FCrimItemViewContext& Context);
 
 protected:
 	/** All container view models that have been created. */
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UCrimItemContainerViewModelBase>> ItemContainerViewModels;
 
-	UCrimItemContainerViewModelBase* CreateContainerViewModel(UCrimItemContainer* Container);
+	UCrimItemContainerViewModelBase* CreateContainerViewModel(UCrimItemContainerBase* Container);
 };

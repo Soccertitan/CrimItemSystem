@@ -3,13 +3,14 @@
 
 #include "UI/CrimItemUISubsystem.h"
 
-#include "CrimItemContainer.h"
+#include "ItemContainer/CrimItemContainer.h"
 #include "CrimItemManagerComponent.h"
 #include "CrimItemStatics.h"
+#include "Engine/AssetManager.h"
 #include "UI/CrimItemContainerProvider.h"
 #include "UI/ViewModel/CrimItemContainerViewModel.h"
 
-UCrimItemContainerViewModelBase* UCrimItemUISubsystem::GetOrCreateItemContainerViewModel(UCrimItemContainer* Container)
+UCrimItemContainerViewModelBase* UCrimItemUISubsystem::GetOrCreateItemContainerViewModel(UCrimItemContainerBase* Container)
 {
 	if (!IsValid(Container))
 	{
@@ -35,12 +36,12 @@ UCrimItemContainerViewModelBase* UCrimItemUISubsystem::GetOrCreateItemContainerV
 {
 	if (UCrimItemManagerComponent* ItemManager = UCrimItemStatics::GetCrimItemManagerComponent(Actor))
 	{
-		return GetOrCreateItemContainerViewModel(ItemManager->GetItemContainer(ContainerId));
+		return GetOrCreateItemContainerViewModel(ItemManager->GetItemContainerByGuid(ContainerId));
 	}
 	return nullptr;
 }
 
-UCrimItemContainer* UCrimItemUISubsystem::GetItemContainerFromProvider(TSubclassOf<UCrimItemContainerProvider> Provider,
+UCrimItemContainerBase* UCrimItemUISubsystem::GetItemContainerFromProvider(TSubclassOf<UCrimItemContainerProvider> Provider,
 	FGameplayTag ContainerId, const FCrimItemViewContext& Context)
 {
 	if (Provider)
@@ -53,9 +54,13 @@ UCrimItemContainer* UCrimItemUISubsystem::GetItemContainerFromProvider(TSubclass
 	return nullptr;
 }
 
-UCrimItemContainerViewModelBase* UCrimItemUISubsystem::CreateContainerViewModel(UCrimItemContainer* Container)
+UCrimItemContainerViewModelBase* UCrimItemUISubsystem::CreateContainerViewModel(UCrimItemContainerBase* Container)
 {
-	UCrimItemContainerViewModelBase* NewVM = NewObject<UCrimItemContainerViewModelBase>(this, Container->GetViewModelClass());
+	if (!Container->GetViewModelClass().Get())
+	{
+		UAssetManager::Get().LoadAssetList({Container->GetViewModelClass().ToSoftObjectPath()})->WaitUntilComplete();
+	}
+	UCrimItemContainerViewModelBase* NewVM = NewObject<UCrimItemContainerViewModelBase>(this, Container->GetViewModelClass().Get());
 	NewVM->SetItemContainer(Container);
 	return NewVM;
 }

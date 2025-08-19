@@ -4,28 +4,62 @@
 #include "UI/ViewModel/CrimItemViewModel.h"
 
 #include "CrimItemDefinition.h"
+#include "CrimItemFastTypes.h"
+#include "Engine/AssetManager.h"
+#include "ItemContainer/CrimItemContainerBase.h"
+#include "ItemDefinitionFragment/CrimItemDefFrag_UI.h"
+
+UCrimItemViewModel::UCrimItemViewModel()
+{
+	Bundles.Add("UI");
+}
 
 void UCrimItemViewModel::OnItemSet()
 {
-	Super::OnItemSet();
+	const FCrimItem* ItemPtr = GetItem().GetPtr<FCrimItem>();
 
-	SetQuantity(GetItem().Get<FCrimItem>().Quantity);
-}
+	// Updating the delegate for listening to item changes.
+	if (ItemContainerBase.Get() != ItemPtr->GetItemContainer())
+	{
+		if (ItemChangedDelegateHandle.IsValid() && IsValid(ItemContainerBase.Get()))
+		{
+			ItemContainerBase.Get()->OnItemChangedDelegate.Remove(ItemChangedDelegateHandle);
+		}
 
-void UCrimItemViewModel::OnItemChanged()
-{
-	Super::OnItemChanged();
+		ItemContainerBase = ItemPtr->GetItemContainer();
+		if (IsValid(ItemPtr->GetItemContainer()))
+		{
+			ItemChangedDelegateHandle = ItemPtr->GetItemContainer()->OnItemChangedDelegate.AddUObject(this, &UCrimItemViewModel::Internal_OnItemChanged);
+		}
+	}
 
-	SetQuantity(GetItem().Get<FCrimItem>().Quantity);
+	FStreamableDelegate Delegate = FStreamableDelegate::CreateUObject(this,
+		&UCrimItemViewModel::Internal_OnItemDefinitionLoaded, ItemPtr->GetItemDefinition());
+	FPrimaryAssetId AssetId = UAssetManager::Get().GetPrimaryAssetIdForPath(
+		ItemPtr->GetItemDefinition().ToSoftObjectPath());
+	ItemDefStreamableHandle = UAssetManager::Get().PreloadPrimaryAssets(
+		{AssetId}, Bundles, true, Delegate);
+
+	SetQuantity(ItemPtr->Quantity);
 }
 
 void UCrimItemViewModel::OnItemDefinitionLoaded(const UCrimItemDefinition* ItemDefinition)
 {
-	Super::OnItemDefinitionLoaded(ItemDefinition);
+	const FCrimItemDefFrag_UI* UIFrag = ItemDefinition->GetFragmentByType<FCrimItemDefFrag_UI>();
+	SetItemName(UIFrag->ItemName);
+	SetItemDescription(UIFrag->ItemDescription);
 
-	SetItemName(ItemDefinition->ItemName);
-	SetItemDescription(ItemDefinition->ItemDescription);
-	SetIcon(ItemDefinition->ItemIcon.Get());
+	// Note! This block of code to load the item icon is temporary until InstancedStructs can load AssetBundles properly.
+	if (UIFrag->ItemIcon.Get())
+	{
+		SetIcon(UIFrag->ItemIcon.Get());
+	}
+	else
+	{
+		FStreamableDelegate Delegate = FStreamableDelegate::CreateUObject(this,
+			&UCrimItemViewModel::Internal_OnIconLoaded, UIFrag->ItemIcon);
+		UAssetManager::Get().LoadAssetList({UIFrag->ItemIcon.ToSoftObjectPath()}, Delegate);
+	}
 }
 
 void UCrimItemViewModel::SetItemName(FText InValue)
@@ -46,4 +80,23 @@ void UCrimItemViewModel::SetIcon(UTexture2D* InValue)
 void UCrimItemViewModel::SetQuantity(int32 InValue)
 {
 	UE_MVVM_SET_PROPERTY_VALUE(Quantity, InValue);
+}
+
+void UCrimItemViewModel::Internal_OnItemDefinitionLoaded(TSoftObjectPtr<UCrimItemDefinition> ItemDefinition)
+{
+	OnItemDefinitionLoaded(ItemDefinition.Get());
+}
+
+void UCrimItemViewModel::Internal_OnIconLoaded(TSoftObjectPtr<UTexture2D> InIcon)
+{
+	SetIcon(InIcon.Get());
+}
+
+void UCrimItemViewModel::Internal_OnItemChanged(UCrimItemContainerBase* ItemContainer, const FFastCrimItem& FastItem)
+{
+	const FCrimItem* ChangedItem = FastItem.Item.GetPtr<FCrimItem>();
+	if (ChangedItem->GetItemGuid() == GetItemGuid())
+	{
+		SetItem(FastItem.Item);
+	}
 }

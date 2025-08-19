@@ -3,19 +3,19 @@
 
 #include "UI/CrimItemContainerProvider.h"
 
-#include "CrimItemContainer.h"
+#include "ItemContainer/CrimItemContainer.h"
 #include "CrimItemManagerComponent.h"
 #include "CrimItemStatics.h"
 #include "Blueprint/UserWidget.h"
 #include "GameFramework/PlayerState.h"
 
-UCrimItemContainer* UCrimItemContainerProvider::ProvideContainer_Implementation(FGameplayTag ContainerId,
+UCrimItemContainerBase* UCrimItemContainerProvider::ProvideContainer_Implementation(FGameplayTag ContainerId,
                                                                                 FCrimItemViewContext Context) const
 {
 	return nullptr;
 }
 
-UCrimItemContainer* UCrimItemContainerProvider_Player::ProvideContainer_Implementation(FGameplayTag ContainerId,
+UCrimItemContainerBase* UCrimItemContainerProvider_Player::ProvideContainer_Implementation(FGameplayTag ContainerId,
 	FCrimItemViewContext Context) const
 {
 	if (!Context.UserWidget)
@@ -28,18 +28,18 @@ UCrimItemContainer* UCrimItemContainerProvider_Player::ProvideContainer_Implemen
 		return nullptr;
 	}
 
-	UCrimItemContainer* Result = nullptr;
+	UCrimItemContainerBase* Result = nullptr;
 
 	if (UCrimItemManagerComponent* ItemManager = UCrimItemStatics::GetCrimItemManagerComponent(Player->GetPawn()))
 	{
-		Result = ItemManager->GetItemContainer(ContainerId);
+		Result = ItemManager->GetItemContainerByGuid(ContainerId);
 	}
 
 	if (!IsValid(Result))
 	{
 		if (UCrimItemManagerComponent* ItemManager = UCrimItemStatics::GetCrimItemManagerComponent(Player->PlayerState))
 		{
-			Result = ItemManager->GetItemContainer(ContainerId);
+			Result = ItemManager->GetItemContainerByGuid(ContainerId);
 		}
 	}
 
@@ -47,7 +47,7 @@ UCrimItemContainer* UCrimItemContainerProvider_Player::ProvideContainer_Implemen
 	{
 		if (UCrimItemManagerComponent* ItemManager = UCrimItemStatics::GetCrimItemManagerComponent(Player))
 		{
-			Result = ItemManager->GetItemContainer(ContainerId);
+			Result = ItemManager->GetItemContainerByGuid(ContainerId);
 		}
 	}
 

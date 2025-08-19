@@ -3,7 +3,7 @@
 
 #include "ItemDrop/CrimItemDropManager.h"
 
-#include "CrimItemContainer.h"
+#include "ItemContainer/CrimItemContainer.h"
 #include "CrimItemGameplayTags.h"
 #include "CrimItemManagerComponent.h"
 #include "ItemDrop/CrimItemDrop.h"
@@ -26,59 +26,45 @@ void ACrimItemDropManager::BeginPlay()
 	if (HasAuthority())
 	{
 		ItemContainer = ItemManagerComponent->CreateItemContainer(
-			FCrimItemGameplayTags::Get().Crim_ItemContainer_ItemDropManager, UCrimItemContainer::StaticClass());
+			FCrimItemGameplayTags::Get().ItemContainer_ItemDropManager, UCrimItemContainerBase::StaticClass());
 	}
 }
 
-ACrimItemDrop* ACrimItemDropManager::DropItem(UCrimItemContainer* SourceContainer, const FGuid& SourceItemId,
-	int32 Quantity, FCrimItemDropParams Params)
+ACrimItemDrop* ACrimItemDropManager::DropItem(const TInstancedStruct<FCrimItem>& Item, FCrimItemDropParams Params)
 {
-	if (!HasAuthority() ||
-		!IsValid(SourceContainer) ||
-		Quantity <= 0 ||
-		!Params.ItemDropClass ||
-		SourceContainer == ItemContainer)
+	if (!HasAuthority() || !Item.IsValid() || !Params.ItemDropClass)
 	{
 		return nullptr;
 	}
 
-	FFastCrimItem* SourceFastItem = SourceContainer->GetItemFromGuid(SourceItemId);
-	if (SourceFastItem == nullptr)
+	const FCrimItem* ItemPtr = Item.GetPtr<FCrimItem>();
+	if (ItemPtr->GetItemContainer() == ItemContainer)
+	{
+		return nullptr;
+	}
+
+	if (ItemPtr->Quantity <= 0)
 	{
 		return nullptr;
 	}
 
 	ClearItemDrops();
-
-	int32 ActualQuantityToDrop = FMath::Min(SourceFastItem->Item.GetPtr<FCrimItem>()->Quantity, Quantity);
-	TInstancedStruct<FCrimItem> NewItem = ItemContainer->AddItem(SourceFastItem->Item, ActualQuantityToDrop);
-	SourceContainer->ConsumeItem(SourceItemId, ActualQuantityToDrop);
-
-	return CreateItemDrop(NewItem.GetPtr<FCrimItem>()->GetItemGuid(), Params);
-}
-
-ACrimItemDrop* ACrimItemDropManager::DropItemBySpec(TInstancedStruct<FCrimItemSpec> ItemSpec, FCrimItemDropParams Params)
-{
-	if (!HasAuthority() || !ItemSpec.IsValid() || !Params.ItemDropClass)
+	TInstancedStruct<FCrimItem> RemovedItem = ItemPtr->GetItemContainer()->RemoveItem(ItemPtr->GetItemGuid());
+	if (!RemovedItem.IsValid())
 	{
 		return nullptr;
 	}
 
-	TInstancedStruct<FCrimItem> NewItem = ItemContainer->AddItemFromSpec(ItemSpec);
-	if (!NewItem.IsValid())
-	{
-		return nullptr;
-	}
-	
-	ClearItemDrops();
-	return CreateItemDrop(NewItem.GetPtr<FCrimItem>()->GetItemGuid(), Params);
+	FCrimAddItemResult Result = ItemContainer->TryAddItem(RemovedItem);
+	FGuid ItemGuid = Result.Items[0].GetPtr<FCrimItem>()->GetItemGuid();
+	return CreateItemDrop(ItemGuid, Params);
 }
 
 void ACrimItemDropManager::ClearItemDrop(ACrimItemDrop* ItemDrop)
 {
 	ItemDrop->OnAllItemsTaken.RemoveAll(this);
 	ItemDrops.Remove(ItemDrop);
-	ItemContainer->RemoveItem(ItemDrop->ItemId);
+	ItemContainer->RemoveItem(ItemDrop->ItemGuid);
 	ItemDrop->Destroy();
 }
 

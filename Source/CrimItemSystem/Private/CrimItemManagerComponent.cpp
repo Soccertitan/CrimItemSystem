@@ -3,7 +3,7 @@
 
 #include "CrimItemManagerComponent.h"
 
-#include "CrimItemContainer.h"
+#include "ItemContainer/CrimItemContainer.h"
 #include "CrimItemDefinition.h"
 #include "CrimItemSettings.h"
 #include "CrimItemSystem.h"
@@ -19,22 +19,25 @@ UCrimItemManagerComponent::UCrimItemManagerComponent()
 	SetIsReplicatedByDefault(true);
 	bReplicateUsingRegisteredSubObjectList = true;
 
-	StartupItemContainers.Add(UCrimItemSettings::GetDefaultContainerId(), UCrimItemSettings::GetDefaultItemContainerClass());
+	StartupItems.Add(UCrimItemSettings::GetDefaultContainerId(), FCrimStartupItems(UCrimItemSettings::GetDefaultItemContainerClass(), {}));
 }
 
 void UCrimItemManagerComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
+	BindToItemContainerListDelegates();
 	CacheIsNetSimulated();
-	InitializeStartupItemContainers();
+	InitializeStartupItems();
 }
 
 void UCrimItemManagerComponent::PostInitProperties()
 {
 	Super::PostInitProperties();
 
-	BindToItemContainerListDelegates();
+	// Actor components can't bind to delegates properly in PostInitProperties when creating this component in the
+	// constructor on an actor using CreateDefaultSubobject. 
+	// BindToItemContainerListDelegates();
 }
 
 void UCrimItemManagerComponent::PreNetReceive()
@@ -60,13 +63,13 @@ void UCrimItemManagerComponent::GetLifetimeReplicatedProps(TArray<class FLifetim
 	DOREPLIFETIME_WITH_PARAMS_FAST(ThisClass, ItemContainerList, Params);
 }
 
-UCrimItemContainer* UCrimItemManagerComponent::GetItemContainer(FGameplayTag ContainerId) const
+UCrimItemContainerBase* UCrimItemManagerComponent::GetItemContainerByGuid(FGameplayTag ContainerGuid) const
 {
-	if (ContainerId.IsValid())
+	if (ContainerGuid.IsValid())
 	{
-		for (const FFastCrimItemContainer& Entry : ItemContainerList.GetItemContainers())
+		for (const FFastCrimItemContainerItem& Entry : ItemContainerList.GetItemContainers())
 		{
-			if (Entry.GetItemContainer()->GetContainerId().MatchesTagExact(ContainerId))
+			if (Entry.GetItemContainer()->GetContainerGuid().MatchesTagExact(ContainerGuid))
 			{
 				return Entry.GetItemContainer();
 			}
@@ -75,14 +78,14 @@ UCrimItemContainer* UCrimItemManagerComponent::GetItemContainer(FGameplayTag Con
 	return nullptr;
 }
 
-bool UCrimItemManagerComponent::HasItemContainer(const UCrimItemContainer* ItemContainer) const
+bool UCrimItemManagerComponent::HasItemContainer(const UCrimItemContainerBase* ItemContainer) const
 {
 	if (!IsValid(ItemContainer))
 	{
 		return false;
 	}
 
-	for (const FFastCrimItemContainer& Entry : GetItemContainers())
+	for (const FFastCrimItemContainerItem& Entry : GetItemContainers())
 	{
 		if (Entry.GetItemContainer() == ItemContainer)
 		{
@@ -93,18 +96,18 @@ bool UCrimItemManagerComponent::HasItemContainer(const UCrimItemContainer* ItemC
 	return false;
 }
 
-const TArray<FFastCrimItemContainer>& UCrimItemManagerComponent::GetItemContainers() const
+const TArray<FFastCrimItemContainerItem>& UCrimItemManagerComponent::GetItemContainers() const
 {
 	return ItemContainerList.GetItemContainers();
 }
 
-FFastCrimItem* UCrimItemManagerComponent::GetItemById(FGuid ItemId) const
+FFastCrimItem* UCrimItemManagerComponent::GetItemByGuid(FGuid ItemGuid) const
 {
-	if (ItemId.IsValid())
+	if (ItemGuid.IsValid())
 	{
-		for (const FFastCrimItemContainer& Entry : GetItemContainers())
+		for (const FFastCrimItemContainerItem& Entry : GetItemContainers())
 		{
-			FFastCrimItem* Item = Entry.GetItemContainer()->GetItemFromGuid(ItemId);
+			FFastCrimItem* Item = Entry.GetItemContainer()->GetItemByGuid(ItemGuid);
 			if (Item != nullptr)
 			{
 				return Item;
@@ -114,13 +117,13 @@ FFastCrimItem* UCrimItemManagerComponent::GetItemById(FGuid ItemId) const
 	return nullptr;
 }
 
-TInstancedStruct<FCrimItem> UCrimItemManagerComponent::K2_GetItemById(FGuid ItemId) const
+TInstancedStruct<FCrimItem> UCrimItemManagerComponent::K2_GetItemByGuid(FGuid ItemGuid) const
 {
-	if (ItemId.IsValid())
+	if (ItemGuid.IsValid())
 	{
-		for (const FFastCrimItemContainer& Entry : GetItemContainers())
+		for (const FFastCrimItemContainerItem& Entry : GetItemContainers())
 		{
-			TInstancedStruct<FCrimItem> Item = Entry.GetItemContainer()->K2_GetItemFromGuid(ItemId);
+			TInstancedStruct<FCrimItem> Item = Entry.GetItemContainer()->K2_GetItemByGuid(ItemGuid);
 			if (Item.IsValid())
 			{
 				return Item;
@@ -130,59 +133,43 @@ TInstancedStruct<FCrimItem> UCrimItemManagerComponent::K2_GetItemById(FGuid Item
 	return TInstancedStruct<FCrimItem>();
 }
 
-TArray<FFastCrimItem*> UCrimItemManagerComponent::GetItemsFromDefinition(const UCrimItemDefinition* ItemDef) const
+TArray<FFastCrimItem*> UCrimItemManagerComponent::GetItemsByDefinition(const UCrimItemDefinition* ItemDefinition) const
 {
 	TArray<FFastCrimItem*> Result;
 
-	if (ItemDef)
+	if (ItemDefinition)
 	{
-		for (const FFastCrimItemContainer& Entry : GetItemContainers())
+		for (const FFastCrimItemContainerItem& Entry : GetItemContainers())
 		{
-			Result.Append(Entry.GetItemContainer()->GetItemsFromDefinition(ItemDef));
+			Result.Append(Entry.GetItemContainer()->GetItemsByDefinition(ItemDefinition));
 		}
 	}
 	return Result;
 	
 }
-TArray<TInstancedStruct<FCrimItem>> UCrimItemManagerComponent::K2_GetItemsFromDefinition(const UCrimItemDefinition* ItemDef) const
+TArray<TInstancedStruct<FCrimItem>> UCrimItemManagerComponent::K2_GetItemsByDefinition(const UCrimItemDefinition* ItemDefinition) const
 {
 	TArray<TInstancedStruct<FCrimItem>> Result;
 
-	if (ItemDef)
+	if (ItemDefinition)
 	{
-		for (const FFastCrimItemContainer& Entry : GetItemContainers())
+		for (const FFastCrimItemContainerItem& Entry : GetItemContainers())
 		{
-			Result.Append(Entry.GetItemContainer()->K2_GetItemsFromDefinition(ItemDef));
+			Result.Append(Entry.GetItemContainer()->K2_GetItemsByDefinition(ItemDefinition));
 		}
 	}
 	return Result;
 }
 
-int32 UCrimItemManagerComponent::GetRemainingCollectionCapacityForItem(const UCrimItemDefinition* ItemDef) const
+void UCrimItemManagerComponent::ConsumeItemsByDefinition(const UCrimItemDefinition* ItemDefinition, int32 Quantity)
 {
-	if (!ItemDef)
-	{
-		return 0;
-	}
-
-	TArray<TInstancedStruct<FCrimItem>> MatchingItems;
-	for (const FFastCrimItemContainer& Entry : GetItemContainers())
-	{
-		MatchingItems.Append(Entry.GetItemContainer()->K2_GetItemsFromDefinition(ItemDef));
-	}
-
-	return ItemDef->CollectionLimit.GetMaxQuantity() - MatchingItems.Num();
-}
-
-void UCrimItemManagerComponent::ConsumeItemsByDefinition(const UCrimItemDefinition* ItemDef, int32 Quantity)
-{
-	if (!HasAuthority() || !ItemDef || Quantity <= 0)
+	if (!HasAuthority() || !ItemDefinition || Quantity <= 0)
 	{
 		return;
 	}
 
 	int32 QuantityRemaining = Quantity;
-	for (FFastCrimItem*& FastItem : GetItemsFromDefinition(ItemDef))
+	for (FFastCrimItem*& FastItem : GetItemsByDefinition(ItemDefinition))
 	{
 		FCrimItem* Item = FastItem->Item.GetMutablePtr<FCrimItem>();
 		const int32 NewQuantity = FMath::Max(Item->Quantity - QuantityRemaining, 0);
@@ -191,7 +178,7 @@ void UCrimItemManagerComponent::ConsumeItemsByDefinition(const UCrimItemDefiniti
 
 		if (NewQuantity <= 0)
 		{
-			Item->GetItemContainer()->RemoveFromItemList(Item->GetItemGuid());
+			Item->GetItemContainer()->Internal_RemoveItem(Item->GetItemGuid());
 		}
 		else
 		{
@@ -205,35 +192,38 @@ void UCrimItemManagerComponent::ConsumeItemsByDefinition(const UCrimItemDefiniti
 	}
 }
 
-UCrimItemContainer* UCrimItemManagerComponent::CreateItemContainer(FGameplayTag ContainerId,
-	TSubclassOf<UCrimItemContainer> ItemContainerClass)
+UCrimItemContainerBase* UCrimItemManagerComponent::CreateItemContainer(FGameplayTag ContainerGuid,
+	TSubclassOf<UCrimItemContainerBase> ItemContainerClass)
 {
-	if (!HasAuthority() || !ItemContainerClass || !ContainerId.IsValid())
+	if (!HasAuthority() || !ItemContainerClass)
 	{
 		return nullptr;
 	}
 
-	const FFastCrimItemContainer* ExistingContainer = ItemContainerList.GetItemContainers().FindByPredicate(
-		[ContainerId](const FFastCrimItemContainer& Entry)
+	if (ContainerGuid.IsValid())
+	{
+		const FFastCrimItemContainerItem* ExistingContainer = ItemContainerList.GetItemContainers().FindByPredicate(
+		   [ContainerGuid](const FFastCrimItemContainerItem& Entry)
+		   {
+			   return Entry.GetItemContainer()->GetContainerGuid().MatchesTagExact(ContainerGuid);
+		   });
+		if (ExistingContainer)
 		{
-			return Entry.GetItemContainer()->GetContainerId().MatchesTagExact(ContainerId);
-		});
-	if (ExistingContainer)
-	{
-		UE_LOG(LogCrimItemSystem, Verbose,
-			   TEXT("CreateItemContainer already has %s as a ContainerId. Skip creating the container."),
-			   *ContainerId.ToString());
-		return nullptr;
+			UE_LOG(LogCrimItemSystem, Verbose,
+				   TEXT("CreateItemContainer already has %s as a ContainerId. Skip creating the container."),
+				   *ContainerGuid.ToString());
+			return nullptr;
+		}
 	}
 
-	UCrimItemContainer* NewContainer = NewObject<UCrimItemContainer>(this, ItemContainerClass);
-	NewContainer->Initialize(this, ContainerId);
+	UCrimItemContainerBase* NewContainer = NewObject<UCrimItemContainerBase>(this, ItemContainerClass);
+	NewContainer->Initialize(this, ContainerGuid);
 	AddReplicatedSubObject(NewContainer);
 	ItemContainerList.AddItemContainer(NewContainer);
 	return NewContainer;
 }
 
-void UCrimItemManagerComponent::DestroyItemContainer(UCrimItemContainer* ItemContainer)
+void UCrimItemManagerComponent::RemoveItemContainer(UCrimItemContainerBase* ItemContainer)
 {
 	if (!HasItemContainer(ItemContainer))
 	{
@@ -251,9 +241,9 @@ FCrimItemManagerSaveData UCrimItemManagerComponent::GetSaveData() const
 {
 	FCrimItemManagerSaveData SaveData;
 
-	for (const FFastCrimItemContainer& Entry : GetItemContainers())
+	for (const FFastCrimItemContainerItem& Entry : GetItemContainers())
 	{
-		UCrimItemContainer* ItemContainer = Entry.GetItemContainer();
+		UCrimItemContainerBase* ItemContainer = Entry.GetItemContainer();
 		if (IsValid(ItemContainer))
 		{
 			SaveData.ItemContainerSaveData.Add(ItemContainer);
@@ -273,8 +263,8 @@ void UCrimItemManagerComponent::LoadSavedData(const FCrimItemManagerSaveData& Sa
 	//----------------------------------------------------------
 	// 1. Remove all existing Items and ItemContainers
 	//----------------------------------------------------------
-	TArray<UCrimItemContainer*> ContainersToDestroy;
-	for (const FFastCrimItemContainer& Container : ItemContainerList.GetItemContainers())
+	TArray<UCrimItemContainerBase*> ContainersToDestroy;
+	for (const FFastCrimItemContainerItem& Container : ItemContainerList.GetItemContainers())
 	{
 		if (IsValid(Container.GetItemContainer()))
 		{
@@ -282,9 +272,9 @@ void UCrimItemManagerComponent::LoadSavedData(const FCrimItemManagerSaveData& Sa
 		}
 	}
 	
-	for (UCrimItemContainer* Container : ContainersToDestroy)
+	for (UCrimItemContainerBase* Container : ContainersToDestroy)
 	{
-		DestroyItemContainer(Container);
+		RemoveItemContainer(Container);
 	}
 	
 	//----------------------------------------------------------
@@ -297,7 +287,7 @@ void UCrimItemManagerComponent::LoadSavedData(const FCrimItemManagerSaveData& Sa
 			UAssetManager::Get().LoadAssetList({ContainerData.ItemContainerClass.ToSoftObjectPath()})->WaitUntilComplete();
 		}
 		
-		UCrimItemContainer* NewContainer = CreateItemContainer(
+		UCrimItemContainerBase* NewContainer = CreateItemContainer(
 			ContainerData.ContainerId,
 			ContainerData.ItemContainerClass.Get()
 		);
@@ -318,6 +308,16 @@ void UCrimItemManagerComponent::LoadSavedData(const FCrimItemManagerSaveData& Sa
 					continue;
 				}
 				
+				// Do not restore the item if it's been depreciated.
+				if (!ItemData.ItemDef.Get())
+				{
+					UAssetManager::Get().LoadAssetList({ItemData.ItemDef.ToSoftObjectPath()})->WaitUntilComplete();
+				}
+				if (!ItemData.ItemDef.Get()->bSpawnable)
+				{
+					continue;
+				}
+				
 				TInstancedStruct<FCrimItem> NewItem;
 				FMemoryReader MemReader(ItemData.ByteData);
 				FObjectAndNameAsStringProxyArchive Ar(MemReader, true);
@@ -325,7 +325,7 @@ void UCrimItemManagerComponent::LoadSavedData(const FCrimItemManagerSaveData& Sa
 				NewItem.Serialize(Ar);
 				if (NewItem.IsValid())
 				{
-					NewContainer->AddItemToItemContainer(NewItem);
+					NewContainer->Internal_AddItem(NewItem);
 				}
 			}
 		}
@@ -337,50 +337,66 @@ bool UCrimItemManagerComponent::HasAuthority() const
 	return !bCachedIsNetSimulated;
 }
 
+void UCrimItemManagerComponent::OnItemContainerAdded(const FFastCrimItemContainerItem& Entry)
+{
+	OnItemContainerAddedDelegate.Broadcast(this, Entry.GetItemContainer());
+	BindToItemContainerDelegates(Entry.GetItemContainer());
+}
+
+void UCrimItemManagerComponent::OnItemContainerRemoved(const FFastCrimItemContainerItem& Entry)
+{
+	OnItemContainerRemovedDelegate.Broadcast(this, Entry.GetItemContainer());
+}
+
+void UCrimItemManagerComponent::OnItemAdded(UCrimItemContainerBase* ItemContainer, const FFastCrimItem& Item)
+{
+	OnItemAddedDelegate.Broadcast(this, ItemContainer, Item);
+}
+
+void UCrimItemManagerComponent::OnItemRemoved(UCrimItemContainerBase* ItemContainer, const FFastCrimItem& Item)
+{
+	OnItemRemovedDelegate.Broadcast(this, ItemContainer, Item);
+}
+
+void UCrimItemManagerComponent::OnItemChanged(UCrimItemContainerBase* ItemContainer, const FFastCrimItem& Item)
+{
+	OnItemChangedDelegate.Broadcast(this, ItemContainer, Item);
+}
+
 void UCrimItemManagerComponent::CacheIsNetSimulated()
 {
 	bCachedIsNetSimulated = IsNetSimulating();
 }
 
-void UCrimItemManagerComponent::InitializeStartupItemContainers()
+void UCrimItemManagerComponent::InitializeStartupItems()
 {
 	if (!HasAuthority())
 	{
 		return;
 	}
 
-	for (const TTuple<FGameplayTag, TSubclassOf<UCrimItemContainer>>& Container : StartupItemContainers)
+	for (const TTuple<FGameplayTag, FCrimStartupItems>& Startup : StartupItems)
 	{
-		CreateItemContainer(Container.Key, Container.Value);
+		UCrimItemContainerBase* ItemContainer = CreateItemContainer(Startup.Key, Startup.Value.ItemContainerClass);
+		if (ItemContainer)
+		{
+			for (const TInstancedStruct<FCrimItem>& Item : Startup.Value.Items)
+			{
+				ItemContainer->TryAddItem(Item);
+			}
+		}
 	}
 }
 
 void UCrimItemManagerComponent::BindToItemContainerListDelegates()
 {
-	if (!ItemContainerList.OnItemContainerAddedDelegate.IsBoundToObject(this))
-	{
-		ItemContainerList.OnItemContainerAddedDelegate.AddWeakLambda(this, [this](const FFastCrimItemContainer& Entry)
-		{
-			BindToItemContainerDelegates(Entry.GetItemContainer());
-		});
-	}
+	ItemContainerList.OnItemContainerAddedDelegate.AddUObject(this, &UCrimItemManagerComponent::OnItemContainerAdded);
+	ItemContainerList.OnItemContainerRemovedDelegate.AddUObject(this, &UCrimItemManagerComponent::OnItemContainerRemoved);
 }
 
-void UCrimItemManagerComponent::BindToItemContainerDelegates(UCrimItemContainer* Container)
+void UCrimItemManagerComponent::BindToItemContainerDelegates(UCrimItemContainerBase* Container)
 {
-	Container->OnItemAddedDelegate.AddWeakLambda(
-		this, [this](UCrimItemContainer* ItemContainer, const FFastCrimItem& Item)
-		{
-			OnItemAddedDelegate.Broadcast(this, ItemContainer, Item);
-		});
-	Container->OnItemRemovedDelegate.AddWeakLambda(
-		this, [this](UCrimItemContainer* ItemContainer, const FFastCrimItem& Item)
-		{
-			OnItemRemovedDelegate.Broadcast(this, ItemContainer, Item);
-		});
-	Container->OnItemChangedDelegate.AddWeakLambda(
-		this, [this](UCrimItemContainer* ItemContainer, const FFastCrimItem& Item)
-		{
-			OnItemChangedDelegate.Broadcast(this, ItemContainer, Item);
-		});
+	Container->OnItemAddedDelegate.AddUObject(this, &UCrimItemManagerComponent::OnItemAdded);
+	Container->OnItemRemovedDelegate.AddUObject(this, &UCrimItemManagerComponent::OnItemRemoved);
+	Container->OnItemChangedDelegate.AddUObject(this, &UCrimItemManagerComponent::OnItemChanged);
 }

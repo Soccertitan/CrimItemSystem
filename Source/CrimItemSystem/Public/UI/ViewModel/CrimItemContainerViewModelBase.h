@@ -10,7 +10,7 @@
 class UCrimItemViewModelBase;
 struct FFastCrimItem;
 struct FCrimItem;
-class UCrimItemContainer;
+class UCrimItemContainerBase;
 
 /**
  * A generic implementation of the ItemContainer ViewModel designed to be subclassed.
@@ -23,10 +23,10 @@ class CRIMITEMSYSTEM_API UCrimItemContainerViewModelBase : public UMVVMViewModel
 public:
 	/** Updates the ItemContainer for this ViewModel. Triggers OnItemContainerSet if a new one is set. */
 	UFUNCTION(BlueprintCallable)
-	void SetItemContainer(UCrimItemContainer* InItemContainer);
+	void SetItemContainer(UCrimItemContainerBase* InItemContainer);
 
 	UFUNCTION(BlueprintPure)
-	UCrimItemContainer* GetItemContainer() const;
+	UCrimItemContainerBase* GetItemContainer() const;
 
 protected:
 
@@ -37,14 +37,20 @@ protected:
 	virtual void OnItemAdded(const TInstancedStruct<FCrimItem>& Item) {}
 	/** Called whenever an item is removed from the ItemContainer. */
 	virtual void OnItemRemoved(const TInstancedStruct<FCrimItem>& Item) {}
+	/** Called whenever an item is changed in the ItemContainer. */
+	virtual void OnItemChanged(const FFastCrimItem& InItem) {}
 
-	/** Creates an ItemViewModel from the Item from the Item's ItemDef and initializes it with the Item. */
+	/**
+	 * Creates an ItemViewModel from the Item from the Item's ItemDef and initializes it with the Item.
+	 * This will synchronously load the ItemDef if it's not already loaded.
+	 */
 	UCrimItemViewModelBase* CreateItemViewModel(const TInstancedStruct<FCrimItem>& Item);
 
 private:
 	UPROPERTY()
-	TWeakObjectPtr<UCrimItemContainer> ItemContainer;
+	TWeakObjectPtr<UCrimItemContainerBase> ItemContainer;
 
-	void Internal_OnItemAdded(UCrimItemContainer* InItemContainer, const FFastCrimItem& InItem);
-	void Internal_OnItemRemoved(UCrimItemContainer* InItemContainer, const FFastCrimItem& InItem);
+	void Internal_OnItemAdded(UCrimItemContainerBase* InItemContainer, const FFastCrimItem& InItem);
+	void Internal_OnItemRemoved(UCrimItemContainerBase* InItemContainer, const FFastCrimItem& InItem);
+	void Internal_OnItemChanged(UCrimItemContainerBase* InItemContainer, const FFastCrimItem& InItem);
 };

@@ -3,7 +3,7 @@
 
 #include "CrimItemFastTypes.h"
 
-#include "CrimItemContainer.h"
+#include "ItemContainer/CrimItemContainer.h"
 #include "CrimItemDefinition.h"
 
 
@@ -52,12 +52,12 @@ void FFastCrimItemList::AddItem(const TInstancedStruct<FCrimItem>& Item)
 	MarkItemDirty(NewItem);
 }
 
-bool FFastCrimItemList::RemoveItem(const FGuid& ItemId)
+bool FFastCrimItemList::RemoveItem(const FGuid& ItemGuid)
 {
 	for (int32 i = Items.Num() - 1; i >= 0; i--)
 	{
 		const FCrimItem* ItemPtr = Items[i].Item.GetPtr<FCrimItem>();
-		if (ItemPtr && ItemPtr->GetItemGuid() == ItemId)
+		if (ItemPtr && ItemPtr->GetItemGuid() == ItemGuid)
 		{
 			FFastCrimItem OldItem = Items[i];
 			Items.RemoveAtSwap(i);
@@ -107,31 +107,31 @@ void FFastCrimItemList::Reset()
 //--------------------------------------------------------------------------
 // FastCrimItemContainer
 //--------------------------------------------------------------------------
-FString FFastCrimItemContainer::ToDebugString() const
+FString FFastCrimItemContainerItem::ToDebugString() const
 {
 	return ItemContainer ? ItemContainer->GetFName().ToString() : TEXT("(none)");
 }
 
-void FFastCrimItemContainer::PostReplicatedAdd(const FFastCrimItemContainerList& InContainer)
+void FFastCrimItemContainerItem::PostReplicatedAdd(const FFastCrimItemContainerList& InItemContainerList)
 {
-	InContainer.OnItemContainerAddedDelegate.Broadcast(*this);
+	InItemContainerList.OnItemContainerAddedDelegate.Broadcast(*this);
 }
 
-void FFastCrimItemContainer::PreReplicatedRemove(const FFastCrimItemContainerList& InContainer)
+void FFastCrimItemContainerItem::PreReplicatedRemove(const FFastCrimItemContainerList& InItemContainerList)
 {
-	InContainer.OnItemContainerRemovedDelegate.Broadcast(*this);
+	InItemContainerList.OnItemContainerRemovedDelegate.Broadcast(*this);
 }
 
 //----------------------------------------------------------------------------------------
 // FastCrimItemContainerList
 //----------------------------------------------------------------------------------------
 
-void FFastCrimItemContainerList::AddItemContainer(UCrimItemContainer* ItemContainer)
+void FFastCrimItemContainerList::AddItemContainer(UCrimItemContainerBase* ItemContainer)
 {
 	if (IsValid(ItemContainer))
 	{
 		// Duplicate check.
-		for (const FFastCrimItemContainer& Entry : Items)
+		for (const FFastCrimItemContainerItem& Entry : Items)
 		{
 			if (Entry.ItemContainer == ItemContainer)
 			{
@@ -139,23 +139,23 @@ void FFastCrimItemContainerList::AddItemContainer(UCrimItemContainer* ItemContai
 			}
 		}
 
-		FFastCrimItemContainer& NewEntry = Items.AddDefaulted_GetRef();
+		FFastCrimItemContainerItem& NewEntry = Items.AddDefaulted_GetRef();
 		NewEntry.ItemContainer = ItemContainer;
 		OnItemContainerAddedDelegate.Broadcast(NewEntry);
 		MarkItemDirty(NewEntry);
 	}
 }
 
-void FFastCrimItemContainerList::RemoveItemContainer(UCrimItemContainer* ItemContainer)
+void FFastCrimItemContainerList::RemoveItemContainer(UCrimItemContainerBase* ItemContainer)
 {
 	if (IsValid(ItemContainer))
 	{
 		for (auto EntryIt = Items.CreateIterator(); EntryIt; ++EntryIt)
 		{
-			FFastCrimItemContainer& Entry = *EntryIt;
+			FFastCrimItemContainerItem& Entry = *EntryIt;
 			if (Entry.ItemContainer == ItemContainer)
 			{
-				FFastCrimItemContainer TempEntry(Entry);
+				FFastCrimItemContainerItem TempEntry(Entry);
 				EntryIt.RemoveCurrentSwap();
 				OnItemContainerRemovedDelegate.Broadcast(TempEntry);
 				return;
@@ -164,7 +164,7 @@ void FFastCrimItemContainerList::RemoveItemContainer(UCrimItemContainer* ItemCon
 	}
 }
 
-const TArray<FFastCrimItemContainer>& FFastCrimItemContainerList::GetItemContainers() const
+const TArray<FFastCrimItemContainerItem>& FFastCrimItemContainerList::GetItemContainers() const
 {
 	return Items;
 }

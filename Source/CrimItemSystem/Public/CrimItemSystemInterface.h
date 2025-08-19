@@ -25,6 +25,6 @@ class CRIMITEMSYSTEM_API ICrimItemSystemInterface
 public:
 
 	// Returns the ItemManagerComponent that can live on an actor such as a pawn or PlayerState.
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "CrimItemSystem")
+	UFUNCTION(BlueprintNativeEvent, Category = "CrimItemSystem")
 	UCrimItemManagerComponent* GetCrimItemManagerComponent() const;
 };

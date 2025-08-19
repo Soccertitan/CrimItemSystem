@@ -11,7 +11,7 @@ struct FCrimItem;
 class ACrimItemDropManager;
 class ACrimItemDrop;
 class UCrimItemManagerComponent;
-class UCrimItemContainer;
+class UCrimItemContainerBase;
 
 DECLARE_MULTICAST_DELEGATE_OneParam(FCrimItemDropGenericSignature, ACrimItemDrop*);
 
@@ -36,7 +36,7 @@ public:
 	 * @param ItemContainer The container to put the item in.
 	 */
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "CrimItemDrop")
-	void TakeItem(UCrimItemContainer* ItemContainer);
+	void TakeItem(UCrimItemContainerBase* ItemContainer);
 
 	/**
 	 * @return A copy of the item held by this item drop.
@@ -49,7 +49,7 @@ public:
 
 	/** Returns the ItemContainer from the ItemDrop */
 	UFUNCTION(BlueprintPure, Category = "CrimItemDrop")
-	UCrimItemContainer* GetItemContainer() const;
+	UCrimItemContainerBase* GetItemContainer() const;
 
 	/**
 	 * Decides if the passed in ItemManager can attempt to take this ItemDrop.
@@ -61,29 +61,29 @@ public:
 
 	/**
 	 * Initializes this actor with an Item and optional context data.
-	 * @param InItemId The item to assign this ItemDrop.
+	 * @param InItemGuid The item to assign this ItemDrop.
 	 * @param Context Custom user data that can be passed in and processed.
 	 */
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "CrimItemDrop")
-	virtual void InitializeItemDrop(FGuid InItemId, UObject* Context);
+	virtual void InitializeItemDrop(FGuid InItemGuid, UObject* Context);
 	
 protected:
 
 	/**
 	 * Called on the server when this actor has been initialized with an item.
-	 * @param InItemId The item this actor was initialized with. The Item is guaranteed to be valid.
+	 * @param InItemGuid The item this actor was initialized with. The Item is guaranteed to be valid.
 	 * @param Context Custom user data that can be passed in and processed.
 	 */
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "InitializeItemDrop")
-	void K2_InitializeItemDrop(FGuid InItemId, UObject* Context);
+	void K2_InitializeItemDrop(FGuid InItemGuid, UObject* Context);
 
 private:
 	UPROPERTY(Replicated)
-	FGuid ItemId;
+	FGuid ItemGuid;
 
 	/** Cached reference to the ItemContainer from the ItemDropManager. */
 	UPROPERTY(BlueprintReadOnly, meta = (AllowPrivateAccess = true))
-	TObjectPtr<UCrimItemContainer> ItemDropItemContainer;
+	TObjectPtr<UCrimItemContainerBase> ItemDropItemContainer;
 
 	friend ACrimItemDropManager;
 };

@@ -6,13 +6,13 @@
 #include "CrimItemContainerViewModelBase.h"
 #include "CrimItemContainerViewModel.generated.h"
 
+class UCrimItemContainer;
 struct FCrimItem;
 struct FFastCrimItem;
-class UCrimItemContainer;
 class UCrimItemViewModelBase;
 
 /**
- * A view model for a Crim Item Container that retrieves the items and creates a ViewModel for each item.
+ * A basic implementation for an ItemContainerViewModel. Retrieves the items and creates a ViewModel for each item.
  */
 UCLASS()
 class CRIMITEMSYSTEM_API UCrimItemContainerViewModel : public UCrimItemContainerViewModelBase
@@ -32,6 +32,8 @@ public:
 
 	UFUNCTION(BlueprintPure, FieldNotify)
 	int32 GetMaxCapacity() const;
+
+	UCrimItemContainer* GetCrimItemContainer() const;
 
 protected:
 	virtual void OnItemContainerSet() override;

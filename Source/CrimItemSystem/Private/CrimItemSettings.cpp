@@ -3,14 +3,14 @@
 
 #include "CrimItemSettings.h"
 
-#include "CrimItemContainer.h"
+#include "ItemContainer/CrimItemContainer.h"
 #include "CrimItemGameplayTags.h"
 #include "CrimItemSystem.h"
 #include "Engine/AssetManager.h"
 
 UCrimItemSettings::UCrimItemSettings()
 {
-	DefaultContainerId = FCrimItemGameplayTags::Get().Crim_ItemContainer_Default;
+	DefaultContainerId = FCrimItemGameplayTags::Get().ItemContainer_Default;
 	DefaultItemContainerClass = UCrimItemContainer::StaticClass();
 }
 
@@ -32,11 +32,11 @@ FGameplayTag UCrimItemSettings::GetDefaultContainerId()
 	return Settings->DefaultContainerId;
 }
 
-TSubclassOf<UCrimItemContainer> UCrimItemSettings::GetDefaultItemContainerClass()
+TSubclassOf<UCrimItemContainerBase> UCrimItemSettings::GetDefaultItemContainerClass()
 {
 	const UCrimItemSettings* Settings = GetDefault<UCrimItemSettings>();
 
-	if (Settings->DefaultItemContainerClass.IsNull())
+	if (!Settings->DefaultItemContainerClass)
 	{
 		UE_LOG(LogCrimItemSystem, Error, TEXT("UCrimItemSettings.DefaultItemContainerClass is not valid. "
 			"Set a value in the project settings."));

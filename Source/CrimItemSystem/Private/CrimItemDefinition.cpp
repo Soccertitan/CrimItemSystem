@@ -8,8 +8,6 @@
 UCrimItemDefinition::UCrimItemDefinition()
 {
 	ItemClass.InitializeAsScriptStruct(FCrimItem::StaticStruct());
-
-	ItemViewModelClass = UCrimItemViewModel::StaticClass();
 }
 
 FPrimaryAssetId UCrimItemDefinition::GetPrimaryAssetId() const

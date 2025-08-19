@@ -4,7 +4,6 @@
 
 #include "CoreMinimal.h"
 #include "CrimItem.h"
-#include "CrimItemTypes.h"
 #include "GameplayTagContainer.h"
 #include "Engine/DataAsset.h"
 #include "CrimItemDefinition.generated.h"
@@ -12,15 +11,16 @@
 
 class UCrimItemViewModelBase;
 
-// Represents a fragment of an item definition. Can contain custom information and initialization.
+// Represents a fragment of an item definition. Contains static information and way to initialize a new item.
 USTRUCT(BlueprintType)
-struct CRIMITEMSYSTEM_API FCrimItemFragment
+struct CRIMITEMSYSTEM_API FCrimItemDefinitionFragment
 {
 	GENERATED_BODY()
 
-	FCrimItemFragment(){}
-	virtual ~FCrimItemFragment() {}
+	FCrimItemDefinitionFragment(){}
+	virtual ~FCrimItemDefinitionFragment() {}
 
+	/** Called when an item is created from an ItemDefinition. */
 	virtual void SetDefaultValues(TInstancedStruct<FCrimItem>& ItemInstance) const {}
 };
 
@@ -39,71 +39,44 @@ public:
 	/** The tags that this item has. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Item")
 	FGameplayTagContainer OwnedTags;
-	
-	/** User facing text of the item name */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Item|UI")
-	FText ItemName;
-
-	/** User facing description of the item */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Item|UI")
-	FText ItemDescription;
-
-	/** The user facing icon of the item. */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Item|UI", meta = (AssetBundles = "UI"))
-	TSoftObjectPtr<UTexture2D> ItemIcon;
-
-	/** The ViewModel to use. */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Item|UI", meta = (AssetBundles = "UI"), NoClear)
-	TSoftClassPtr<UCrimItemViewModelBase> ItemViewModelClass;
-
-	/** The widget to display item information. This class should implement the CrimItemVMInterface. */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Item|UI", meta = (AssetBundles = "UI"))
-	TSoftClassPtr<UUserWidget> ItemWidgetClass;
 
 	/** The default stats for the item. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Item", meta = (ForceInlineRow, ClampMin=1))
 	TMap<FGameplayTag, int32> DefaultStats;
 
-	/** The maximum number of unique item instances allowed to be managed by the ItemManager. */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Item")
-	FCrimItemQuantityLimit CollectionLimit;
-
-	/** The maximum number of unique item instances allowed in a single container. */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Item")
-	FCrimItemQuantityLimit ContainerLimit;
-
-	/** The maximum quantity of this item allowed in a single stack. */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Item")
-	FCrimItemQuantityLimit StackLimit;
-
-	/** Defines custom item functionality. */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Item", meta = (NoResetToDefault, FullyExpand=true, ExcludeBaseStruct))
-	TArray<TInstancedStruct<FCrimItemFragment>> Fragments;
+	/**
+	 * Defines custom item functionality.
+	 * @note Soft Class/Object nested in a UPROPERTY for InstancedStruct currently (UE5.5) does not load AssetBundles when marked.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Item", meta = (FullyExpand=true, ExcludeBaseStruct))
+	TArray<TInstancedStruct<FCrimItemDefinitionFragment>> Fragments;
 
 	/** If set to false, this item should not be created. Useful for marking a deprecated item. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Item", AdvancedDisplay, AssetRegistrySearchable)
 	bool bSpawnable = true;
 
 	/** The Item class to use to create from this ItemDef */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Item", AdvancedDisplay, NoClear)
+	UPROPERTY(BlueprintReadOnly)
 	TInstancedStruct<FCrimItem> ItemClass;
 
 	virtual FPrimaryAssetId GetPrimaryAssetId() const override;
 
-	/**
-	 * @tparam T Must be of type FCrimItemFragment.
-	 * @return A const pointer to the first FCrimItemFragment that matches the type.
-	 */
-	template <typename T>
-	const T* FindFragmentByClass() const
-	{
-		for (const TInstancedStruct<FCrimItemFragment>& Fragment : Fragments)
-		{
-			if (Fragment.IsValid() && Fragment.GetPtr<T>())
-			{
-				return Fragment.GetPtr<T>();
-			}
-		}
-		return nullptr;
-	}
+	template<typename T> requires std::derived_from<T, FCrimItemDefinitionFragment>
+	const T* GetFragmentByType() const;
 };
+
+/**
+ * @return A const pointer to the first FCrimItemFragment that matches the type.
+ */
+template <typename T> requires std::derived_from<T, FCrimItemDefinitionFragment>
+const T* UCrimItemDefinition::GetFragmentByType() const
+{
+	for (const TInstancedStruct<FCrimItemDefinitionFragment>& Fragment : Fragments)
+	{
+		if (const T* FragmentPtr = Fragment.GetPtr<T>())
+		{
+			return FragmentPtr;
+		}
+	}
+	return nullptr;
+}

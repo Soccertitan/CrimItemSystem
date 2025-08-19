@@ -9,7 +9,7 @@
 
 class UCrimItemContainerViewModelBase;
 class UCrimItemContainerProvider;
-class UCrimItemContainer;
+class UCrimItemContainerBase;
 
 /**
  * Base class for a view model resolver for CrimItems.
@@ -25,7 +25,7 @@ public:
 	virtual UCrimItemContainerViewModelBase* GetItemContainerViewModel(const UUserWidget* UserWidget, const UMVVMView* View) const;
 
 	/** Returns the relevant CrimItemContainer. */
-	virtual UCrimItemContainer* GetItemContainer(const UUserWidget* UserWidget, const UMVVMView* View) const;
+	virtual UCrimItemContainerBase* GetItemContainer(const UUserWidget* UserWidget, const UMVVMView* View) const;
 };
 
 /**
@@ -49,5 +49,5 @@ public:
 	FGameplayTag ContainerId;
 
 	virtual UObject* CreateInstance(const UClass* ExpectedType, const UUserWidget* UserWidget, const UMVVMView* View) const override;
-	virtual UCrimItemContainer* GetItemContainer(const UUserWidget* UserWidget, const UMVVMView* View) const override;
+	virtual UCrimItemContainerBase* GetItemContainer(const UUserWidget* UserWidget, const UMVVMView* View) const override;
 };

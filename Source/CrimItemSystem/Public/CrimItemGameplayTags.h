@@ -21,21 +21,21 @@ private:
 	
 public:
 
-	FGameplayTag Crim_ItemContainer_Default;
+	FGameplayTag ItemContainer_Default;
 
-	FGameplayTag Crim_ItemContainer_ItemDropManager;
+	FGameplayTag ItemContainer_ItemDropManager;
 	
 	/**
 	 * Generic Root Gameplay Tags
 	 */
-	FGameplayTag Crim_ItemPlan_Error;
+	FGameplayTag ItemPlan_Error;
 	
 	/**
 	 * Add Item Plan Errors
 	 */
-	FGameplayTag Crim_ItemPlan_Error_InvalidItem;
-	FGameplayTag Crim_ItemPlan_Error_ItemContainerNotFound;
-	FGameplayTag Crim_ItemPlan_Error_CantContainItem;
-	FGameplayTag Crim_ItemPlan_Error_QuantityIsZero;
-	FGameplayTag Crim_ItemPlan_Error_MaxStacksReached;
+	FGameplayTag ItemPlan_Error_InvalidItem;
+	FGameplayTag ItemPlan_Error_ItemContainerNotFound;
+	FGameplayTag ItemPlan_Error_CantContainItem;
+	FGameplayTag ItemPlan_Error_QuantityIsZero;
+	FGameplayTag ItemPlan_Error_MaxStacksReached;
 };

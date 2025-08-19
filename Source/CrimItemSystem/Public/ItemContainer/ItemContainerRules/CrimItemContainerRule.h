@@ -3,11 +3,11 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "CrimItemContainer.h"
+#include "ItemContainer/CrimItemContainer.h"
 #include "UObject/Object.h"
 #include "CrimItemContainerRule.generated.h"
 
-class UCrimItemContainer;
+class UCrimItemContainerBase;
 
 /**
  * Defines container specific conditions. For example, stack limitations for items. These will override item specific
@@ -21,54 +21,50 @@ class CRIMITEMSYSTEM_API UCrimItemContainerRule : public UObject
 public:
 	UCrimItemContainerRule();
 
-	/**
-	 * Returns true if the item is allowed in the container.
-	 */
+	/** Returns true if the item is allowed in the container. */
 	UFUNCTION(BlueprintPure)
-	virtual bool CanContainItem(const UCrimItemContainer* Container, const TInstancedStruct<FCrimItem>& Item) const;
+	virtual bool CanAddItem(const UCrimItemContainerBase* Container, const TInstancedStruct<FCrimItem>& Item, FGameplayTag& OutError) const;
 
-	/**
-	 * Returns true if the item is allowed to be removed without being consumed.
-	 */
+	/** Returns true if the item is allowed to be removed directly. */
 	UFUNCTION(BlueprintPure)
-	virtual bool CanRemoveItem(const UCrimItemContainer* Container, const TInstancedStruct<FCrimItem>& Item) const;
+	virtual bool CanRemoveItem(const UCrimItemContainerBase* Container, const TInstancedStruct<FCrimItem>& Item) const;
 
 	/** Return the maximum number of unique item instances the item can occupy in the container */
 	UFUNCTION(BlueprintPure)
-	virtual int32 GetMaxNumberOfStacks(const UCrimItemContainer* Container, const TInstancedStruct<FCrimItem>& Item) const;
+	virtual int32 GetMaxNumberOfStacks(const UCrimItemContainerBase* Container, const TInstancedStruct<FCrimItem>& Item) const;
 
 	/** Return the maximum allowed quantity for a single stack of an item. */
 	UFUNCTION(BlueprintPure)
-	virtual int32 GetItemStackMaxQuantity(const UCrimItemContainer* Container, const TInstancedStruct<FCrimItem>& Item) const;
+	virtual int32 GetItemStackMaxQuantity(const UCrimItemContainerBase* Container, const TInstancedStruct<FCrimItem>& Item) const;
 
 protected:
 	/**
 	 * Returns true if the item is allowed in the container.
 	 * The Container and Item is guaranteed to be valid.
 	 */
-	UFUNCTION(BlueprintImplementableEvent, DisplayName = "CanContainItem")
-	bool K2_CanContainItem(const UCrimItemContainer* Container, const TInstancedStruct<FCrimItem>& Item) const;
+	UFUNCTION(BlueprintImplementableEvent, DisplayName = "CanAddItem")
+	bool K2_CanAddItem(const UCrimItemContainerBase* Container, const TInstancedStruct<FCrimItem>& Item, FGameplayTag& OutError) const;
 
 	/**
 	 * Returns true if the item is allowed to be removed without being consumed.
-	 * The Container and Item is guarnteed to be valid.
+	 * The Container and Item is guaranteed to be valid.
 	 */
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "CanRemoveItem")
-	bool K2_CanRemoveItem(const UCrimItemContainer* Container, const TInstancedStruct<FCrimItem>& Item) const;
+	bool K2_CanRemoveItem(const UCrimItemContainerBase* Container, const TInstancedStruct<FCrimItem>& Item) const;
 
 	/**
 	 * Return the maximum number of unique item instances the item can occupy in the container.
 	 * The Container and Item is guaranteed to be valid.
 	 */
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "GetMaxNumberOfStacks")
-	int32 K2_GetMaxNumberOfStacks(const UCrimItemContainer* Container, const TInstancedStruct<FCrimItem>& Item) const;
+	int32 K2_GetMaxNumberOfStacks(const UCrimItemContainerBase* Container, const TInstancedStruct<FCrimItem>& Item) const;
 
 	/**
 	 * Return the maximum allowed quantity for a single stack of an item.
 	 * The Container and Item is guaranteed to be valid.
 	 */
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "GetItemQuantityLimit")
-	bool K2_GetItemStackMaxQuantity(const UCrimItemContainer* Container, const TInstancedStruct<FCrimItem>& Item) const;
+	bool K2_GetItemStackMaxQuantity(const UCrimItemContainerBase* Container, const TInstancedStruct<FCrimItem>& Item) const;
 
 private:
 

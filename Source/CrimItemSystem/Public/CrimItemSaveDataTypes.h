@@ -10,7 +10,7 @@
 
 struct FCrimItem;
 class UCrimItemDefinition;
-class UCrimItemContainer;
+class UCrimItemContainerBase;
 
 /** Contains the save data for an item. */
 USTRUCT(BlueprintType)
@@ -39,7 +39,7 @@ struct CRIMITEMSYSTEM_API FCrimItemContainerSaveData
 
 	FCrimItemContainerSaveData(){}
 
-	FCrimItemContainerSaveData(UCrimItemContainer* InItemContainer);
+	FCrimItemContainerSaveData(UCrimItemContainerBase* InItemContainer);
 
 	/** The ContainerId */
 	UPROPERTY(BlueprintReadOnly)
@@ -47,7 +47,7 @@ struct CRIMITEMSYSTEM_API FCrimItemContainerSaveData
 
 	/** The class of ItemContainer to spawn. */
 	UPROPERTY(BlueprintReadOnly)
-	TSoftClassPtr<UCrimItemContainer> ItemContainerClass;
+	TSoftClassPtr<UCrimItemContainerBase> ItemContainerClass;
 
 	/** The ItemContainer's serialized SaveGame properties. */
 	UPROPERTY()
