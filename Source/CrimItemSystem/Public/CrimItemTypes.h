@@ -4,11 +4,12 @@
 
 #include "CoreMinimal.h"
 #include "GameplayTagContainer.h"
-#include "Net/Serialization/FastArraySerializer.h"
 #include "StructUtils/InstancedStruct.h"
 
 #include "CrimItemTypes.generated.h"
 
+class UCrimItemSet;
+class UCrimItemInstance;
 class UCrimItemContainerBase;
 struct FCrimItem;
 struct FCrimItemFragment;
@@ -180,7 +181,7 @@ struct CRIMITEMSYSTEM_API FCrimItemDropParams
  * Represents a single gameplay tag and a count.
  */
 USTRUCT(BlueprintType)
-struct CRIMITEMSYSTEM_API FCrimItemTagStack : public FFastArraySerializerItem
+struct CRIMITEMSYSTEM_API FCrimItemTagStack
 {
 	GENERATED_BODY()
 
@@ -210,15 +211,11 @@ struct CRIMITEMSYSTEM_API FCrimItemTagStack : public FFastArraySerializerItem
 	int32 GetCount() const;
 
 private:
-	UPROPERTY(BlueprintReadOnly, meta = (AllowPrivateAccess = true))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = true), SaveGame)
 	FGameplayTag Tag;
 
-	UPROPERTY(BlueprintReadOnly, meta = (AllowPrivateAccess = true))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = true), SaveGame)
 	int32 Count = 0;
-
-	// Used to track delta's.
-	UPROPERTY(NotReplicated, BlueprintReadOnly, meta = (AllowPrivateAccess = true))
-	int32 LastObservedCount = INDEX_NONE;
 
 	friend FCrimItemTagStackContainer;
 };
@@ -227,17 +224,11 @@ private:
  * Container of game item tag stacks, designed for fast replication.
  */
 USTRUCT(BlueprintType)
-struct CRIMITEMSYSTEM_API FCrimItemTagStackContainer : public FFastArraySerializer
+struct CRIMITEMSYSTEM_API FCrimItemTagStackContainer
 {
 	GENERATED_BODY()
 
-	DECLARE_MULTICAST_DELEGATE_ThreeParams(FCrimItemTagStackContainerUpdatedSignature, const FGameplayTag&, int32 /*New Count*/, int32 /*Old Count*/);
-
-	FCrimItemTagStackContainer()
-	{
-	}
-
-	FCrimItemTagStackContainerUpdatedSignature OnTagCountUpdatedDelegate;
+	FCrimItemTagStackContainer() {}
 
 	/** Add stacks to a tag. */
 	void AddStack(FGameplayTag Tag, int32 DeltaCount);
@@ -249,10 +240,7 @@ struct CRIMITEMSYSTEM_API FCrimItemTagStackContainer : public FFastArraySerializ
 	void RemoveStack(FGameplayTag Tag);
 
 	/** Return the stack count for a tag, or 0 if the tag is not present. */
-	int32 GetStackCount(FGameplayTag Tag) const
-	{
-		return StackCountMap.FindRef(Tag);
-	}
+	int32 GetStackCount(FGameplayTag Tag) const;
 
 	/** Returns a const reference to the current TagStats. */
 	const TArray<FCrimItemTagStack>& GetTagStats() const;
@@ -262,18 +250,6 @@ struct CRIMITEMSYSTEM_API FCrimItemTagStackContainer : public FFastArraySerializ
 
 	/** Empties all stats in this container. */
 	void Empty();
-
-	// FFastArraySerializer
-	void PreReplicatedRemove(const TArrayView<int32> RemovedIndices, int32 FinalSize);
-	void PostReplicatedAdd(const TArrayView<int32> AddedIndices, int32 FinalSize);
-	void PostReplicatedChange(const TArrayView<int32> ChangedIndices, int32 FinalSize);
-
-	bool NetDeltaSerialize(FNetDeltaSerializeInfo& DeltaParms)
-	{
-		return FastArrayDeltaSerialize<FCrimItemTagStack, FCrimItemTagStackContainer>(Items, DeltaParms, *this);
-	}
-
-	void PostSerialize(const FArchive& Ar);
 
 	FString ToDebugString() const;
 
@@ -288,23 +264,8 @@ struct CRIMITEMSYSTEM_API FCrimItemTagStackContainer : public FFastArraySerializ
 	}
 
 private:
-	/** Replicated array of gameplay tag stacks. */
-	UPROPERTY()
+	UPROPERTY(EditAnywhere, SaveGame)
 	TArray<FCrimItemTagStack> Items;
-
-	/** Cached map of stack counts by tag, for faster lookup. */
-	UPROPERTY(NotReplicated, BlueprintReadOnly, meta = (AllowPrivateAccess = true))
-	TMap<FGameplayTag, int32> StackCountMap;
-};
-
-template <>
-struct TStructOpsTypeTraits<FCrimItemTagStackContainer> : public TStructOpsTypeTraitsBase2<FCrimItemTagStackContainer>
-{
-	enum
-	{
-		WithNetDeltaSerializer = true,
-		WithPostSerialize = true,
-	};
 };
 
 USTRUCT(BlueprintType)
@@ -318,5 +279,5 @@ struct CRIMITEMSYSTEM_API FCrimStartupItems
 
 	// The items to try and add to the container.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TArray<TInstancedStruct<FCrimItem>> Items;
+	TArray<TObjectPtr<UCrimItemSet>> ItemSets;
 };

@@ -5,6 +5,7 @@
 
 #include "ItemContainer/CrimItemContainer.h"
 #include "CrimItemDefinition.h"
+#include "CrimItemSet.h"
 #include "CrimItemSettings.h"
 #include "CrimItemSystem.h"
 #include "Engine/AssetManager.h"
@@ -377,12 +378,17 @@ void UCrimItemManagerComponent::InitializeStartupItems()
 
 	for (const TTuple<FGameplayTag, FCrimStartupItems>& Startup : StartupItems)
 	{
-		UCrimItemContainerBase* ItemContainer = CreateItemContainer(Startup.Key, Startup.Value.ItemContainerClass);
-		if (ItemContainer)
+		if (UCrimItemContainerBase* ItemContainer = CreateItemContainer(Startup.Key, Startup.Value.ItemContainerClass))
 		{
-			for (const TInstancedStruct<FCrimItem>& Item : Startup.Value.Items)
+			for (const UCrimItemSet* ItemSet : Startup.Value.ItemSets)
 			{
-				ItemContainer->TryAddItem(Item);
+				if (ItemSet)
+				{
+					for (const FCrimItemInstance& ItemInstance : ItemSet->ItemInstances)
+					{
+						ItemContainer->TryAddItem(ItemInstance.GetItem());	
+					}
+				}
 			}
 		}
 	}

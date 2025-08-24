@@ -47,7 +47,7 @@ struct CRIMITEMSYSTEM_API FCrimItem
 	FCrimItemTagStackContainer TagStats;
 
 	/** Extends an item's capabilities. */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, SaveGame, meta = (FullyExpand=true, ExcludeBaseStruct))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, SaveGame, meta = (FullyExpand=true, StructTypeConst), EditFixedSize)
 	TArray<TInstancedStruct<FCrimItemFragment>> Fragments;
 
 	/** Returns true if this Item has the same ItemDefinition, TagStats, and ItemExtensions as the TestItem. */
@@ -72,7 +72,7 @@ private:
 	FGuid ItemGuid;
 
 	/** The static data representing this item. */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = true), SaveGame)
+	UPROPERTY(BlueprintReadOnly, meta = (AllowPrivateAccess = true), SaveGame)
 	TSoftObjectPtr<UCrimItemDefinition> ItemDefinition;
 	
 	/** The ItemManager that owns this item. */

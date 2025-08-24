@@ -64,7 +64,7 @@ void ACrimItemDropManager::ClearItemDrop(ACrimItemDrop* ItemDrop)
 {
 	ItemDrop->OnAllItemsTaken.RemoveAll(this);
 	ItemDrops.Remove(ItemDrop);
-	ItemContainer->RemoveItem(ItemDrop->ItemGuid);
+	(void)ItemContainer->RemoveItem(ItemDrop->ItemGuid);
 	ItemDrop->Destroy();
 }
 

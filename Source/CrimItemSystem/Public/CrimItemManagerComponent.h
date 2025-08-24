@@ -60,7 +60,7 @@ public:
 	 * @return The ItemContainer with the matching ContainerId.
 	 */
 	UFUNCTION(BlueprintPure, Category = "CrimItemManagerComponent")
-	UCrimItemContainerBase* GetItemContainerByGuid(FGameplayTag ContainerGuid) const;
+	UCrimItemContainerBase* GetItemContainerByGuid(UPARAM(meta = (Categories = "ItemContainer")) FGameplayTag ContainerGuid) const;
 
 	/** Returns true if this ItemManager manages the passed in ItemContainer. */
 	UFUNCTION(BlueprintPure, Category = "CrimItemManagerComponent")
@@ -158,7 +158,7 @@ private:
 
 public:
 	/** The startup item containers. Mapped to a GameplayTag for the ContainerId. */
-	UPROPERTY(EditAnywhere, Category = "CrimItemManagerComponent", meta=(ForceInlineRow))
+	UPROPERTY(EditAnywhere, Category = "CrimItemManagerComponent", meta=(ForceInlineRow, Categories = "ItemContainer"))
 	TMap<FGameplayTag, FCrimStartupItems> StartupItems;
 
 private:

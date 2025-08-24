@@ -48,18 +48,7 @@ void UCrimItemViewModel::OnItemDefinitionLoaded(const UCrimItemDefinition* ItemD
 	const FCrimItemDefFrag_UI* UIFrag = ItemDefinition->GetFragmentByType<FCrimItemDefFrag_UI>();
 	SetItemName(UIFrag->ItemName);
 	SetItemDescription(UIFrag->ItemDescription);
-
-	// Note! This block of code to load the item icon is temporary until InstancedStructs can load AssetBundles properly.
-	if (UIFrag->ItemIcon.Get())
-	{
-		SetIcon(UIFrag->ItemIcon.Get());
-	}
-	else
-	{
-		FStreamableDelegate Delegate = FStreamableDelegate::CreateUObject(this,
-			&UCrimItemViewModel::Internal_OnIconLoaded, UIFrag->ItemIcon);
-		UAssetManager::Get().LoadAssetList({UIFrag->ItemIcon.ToSoftObjectPath()}, Delegate);
-	}
+	SetIcon(UIFrag->ItemIcon.Get());
 }
 
 void UCrimItemViewModel::SetItemName(FText InValue)

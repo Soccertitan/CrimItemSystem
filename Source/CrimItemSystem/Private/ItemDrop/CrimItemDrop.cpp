@@ -53,7 +53,7 @@ void ACrimItemDrop::TakeItem(UCrimItemContainerBase* ItemContainer)
 
 	if (Item->Quantity <= 0)
 	{
-		ItemDropItemContainer->RemoveItem(ItemGuid);
+		(void)ItemDropItemContainer->RemoveItem(ItemGuid);
 		OnAllItemsTaken.Broadcast(this);
 	}
 }
